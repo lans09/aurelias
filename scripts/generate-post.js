@@ -104,6 +104,32 @@ const PILLARS = [
   },
 ];
 
+function getTimingContext() {
+  const ROUND_MS = 72 * 60 * 60 * 1000;
+  const customDeadline = process.env.ROUND_DEADLINE_ISO
+    ? Date.parse(process.env.ROUND_DEADLINE_ISO)
+    : NaN;
+
+  let remainingMs;
+  if (!Number.isNaN(customDeadline) && customDeadline > Date.now()) {
+    remainingMs = customDeadline - Date.now();
+  } else {
+    const anchor = Date.UTC(2026, 10, 15, 0, 0, 0);
+    const elapsed = (Date.now() - anchor) % ROUND_MS;
+    remainingMs = ROUND_MS - (elapsed < 0 ? elapsed + ROUND_MS : elapsed);
+  }
+
+  const hoursLeft = Math.max(1, Math.floor(remainingMs / (60 * 60 * 1000)));
+  const label =
+    hoursLeft <= 6
+      ? `Final ${hoursLeft}h left in this 72h round`
+      : hoursLeft <= 24
+        ? `Under ${hoursLeft}h left in the 72h Season 04 round`
+        : `${hoursLeft}h remaining in the current 72h Season 04 window`;
+
+  return { hoursLeft, label };
+}
+
 function pickWeightedPillar() {
   const total = PILLARS.reduce((sum, p) => sum + p.weight, 0);
   let r = Math.random() * total;
@@ -159,7 +185,7 @@ function sanitizeTweet(raw, siteUrl, includeUrl) {
   return text;
 }
 
-function buildFallbackPost(siteUrl, pillar, angle) {
+function buildFallbackPost(siteUrl, pillar, angle, timing) {
   if (!pillar.isPromo) {
     const organicPool = [
       'Most people still underestimate how much cross-border volume now settles in USDC instead of traditional bank rails. Speed and transparency compound quietly.',
@@ -173,15 +199,15 @@ function buildFallbackPost(siteUrl, pillar, angle) {
   }
 
   const promoPool = [
-    `36 winners share 50,000 USDC in AURELIAS Season 04. 1x 20,000 USDC grand prize, 5x 3,000 USDC, and 30x 500 USDC for a $2 entry. ${siteUrl}`,
-    `Enter AURELIAS Season 04 in under a minute using ETH, BNB, USDT, TON, Solana, or Bitcoin. No wallet popups. ${siteUrl}`,
-    `30 community winners take 500 USDC each in Season 04, a 250x return on a $2 entry. ${siteUrl}`,
+    `${timing.label}. 36 winners share 50,000 USDC in AURELIAS Season 04 for a $2 entry. ${siteUrl}`,
+    `${timing.label}. Enter AURELIAS Season 04 in under a minute using ETH, BNB, USDT, TON, Solana, or Bitcoin (15-min payment window). ${siteUrl}`,
+    `${timing.label}. 30 community winners take 500 USDC each in Season 04, alongside the 20,000 USDC grand prize. ${siteUrl}`,
   ];
   const text = sanitizeTweet(promoPool[Math.floor(Math.random() * promoPool.length)], siteUrl, true);
   return { text, angle: angle.name, imagePrompt: angle.visualSeed };
 }
 
-async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history) {
+async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing) {
   const endpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
 
@@ -197,7 +223,7 @@ async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history) {
     '- NO crypto bro slang or emojis: LFG, WAGMI, GM frens, to the moon, gem, rocket/fire/sparkle emojis.',
     '- Under 255 characters total.',
     pillar.isPromo
-      ? `This is a PROMO post for AURELIAS Season 04. Facts: 50,000 USDC pool, 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC), $2 entry, ETH/BNB/USDT/TON/Solana/BTC, Chainlink VRF v2.5. MUST include exact URL: ${siteUrl}`
+      ? `This is a PROMO post for AURELIAS Season 04. Facts: 50,000 USDC pool, 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC), $2 entry, ETH/BNB/USDT/TON/Solana/BTC, Chainlink VRF v2.5, 15-minute payment window. Timing urgency to include naturally: "${timing.label}". MUST include exact URL: ${siteUrl}`
       : 'This is an ORGANIC post. Do NOT mention AURELIAS, giveaways, raffles, or include any URL. Sound like a genuine, thoughtful account.',
     recentTexts ? `Recent posts (DO NOT repeat these openers, phrasing, or angles):\n${recentTexts}` : '',
     'Task: Draft 3 distinct candidates, score each 1-10 on originality and human naturalness, and output ONLY the highest-scoring candidate in JSON: { "bestTweet": "...", "score": 9, "imagePrompt": "..." }.',
@@ -322,6 +348,7 @@ async function main() {
   const apiKey = (process.env.GEMINI_API_KEY || '').trim();
   const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim() || DEFAULT_SITE_URL;
   const history = loadHistory();
+  const timing = getTimingContext();
 
   const pillar = pickWeightedPillar();
   const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
@@ -330,14 +357,14 @@ async function main() {
   let copySource = 'fallback';
   if (apiKey) {
     try {
-      post = await generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history);
+      post = await generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing);
       copySource = 'gemini-2.5-flash';
     } catch (err) {
       console.warn('Gemini copy generation failed, using fallback:', err.message);
-      post = buildFallbackPost(siteUrl, pillar, angle);
+      post = buildFallbackPost(siteUrl, pillar, angle, timing);
     }
   } else {
-    post = buildFallbackPost(siteUrl, pillar, angle);
+    post = buildFallbackPost(siteUrl, pillar, angle, timing);
   }
 
   let imagePath = FALLBACK_IMAGES[Math.floor(Math.random() * FALLBACK_IMAGES.length)];
