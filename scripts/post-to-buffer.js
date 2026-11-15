@@ -125,7 +125,6 @@ async function main() {
         }
         ... on MutationError {
           message
-          code
         }
       }
     }`,
