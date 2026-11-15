@@ -331,6 +331,39 @@ async function generateImageWithGemini(apiKey, imagePrompt) {
   return `assets/social/generated/${filename}`;
 }
 
+async function generateImageWithPollinations(imagePrompt) {
+  const seed = Math.floor(Math.random() * 9999999);
+  const fullPrompt = `${imagePrompt} Ultra-luxury dark obsidian studio photography, brushed titanium, subtle electric lime #84cc16 rim lighting, high contrast, 16:9, no watermark`;
+  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1280&height=720&seed=${seed}&nologo=true`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`Pollinations image error (${res.status})`);
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.startsWith('image/')) {
+      throw new Error(`Pollinations returned non-image content-type: ${contentType}`);
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 5000) {
+      throw new Error(`Pollinations returned unexpectedly small image (${buf.length} bytes)`);
+    }
+    const ext = contentType.includes('png') ? 'png' : 'jpg';
+    const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+    const rand = crypto.randomBytes(3).toString('hex');
+    const filename = `post-${stamp}-${rand}.${ext}`;
+
+    fs.mkdirSync(GENERATED_DIR, { recursive: true });
+    fs.writeFileSync(path.join(GENERATED_DIR, filename), buf);
+    return `assets/social/generated/${filename}`;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function pruneOldGeneratedImages(maxAgeDays = 14) {
   if (!fs.existsSync(GENERATED_DIR)) return;
   const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
@@ -402,12 +435,25 @@ async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview,
 
   let imagePath = FALLBACK_IMAGES[Math.floor(Math.random() * FALLBACK_IMAGES.length)];
   let imageSource = 'fallback-static';
-  if (apiKey && !isPreview) {
-    try {
-      imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
-      imageSource = 'gemini-2.5-flash-image';
-    } catch (err) {
-      console.warn('Gemini image generation failed, using fallback static image:', err.message);
+  if (!isPreview) {
+    if (apiKey) {
+      try {
+        imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
+        imageSource = 'gemini-2.5-flash-image';
+      } catch (err) {
+        console.warn('Gemini image generation failed, trying Pollinations:', err.message);
+      }
+    } else {
+      console.warn('GEMINI_API_KEY is not set; using Pollinations for unique image generation.');
+    }
+
+    if (imageSource === 'fallback-static') {
+      try {
+        imagePath = await generateImageWithPollinations(post.imagePrompt);
+        imageSource = 'pollinations';
+      } catch (err) {
+        console.warn('Pollinations image generation failed, using static fallback:', err.message);
+      }
     }
   }
 
@@ -450,6 +496,9 @@ async function main() {
     });
     batch.push(item);
     history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, text: item.text }].slice(-15);
+    if (!isPreview && i < count - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 
   if (!isPreview) {
