@@ -12,19 +12,27 @@ const TON_RECEIVING = 'UQCU7yEFzHJqQc-x0YOuPWXX7LFnNvtDnbjs7dxLMQfgM9oj';
 const ASSETS = {
   ETH: {
     name: 'ETH',
-    amountLabel: '0.001 ETH',
+    coingeckoId: 'ethereum',
+    symbol: 'ETH',
+    decimals: 5,
+    amountLabel: '0.00111 ETH',
     receivingAddress: EVM_RECEIVING,
     placeholder: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-    hint: 'Enter the EVM address you will send $2 (0.001 ETH) from.',
+    hint: 'Enter the EVM address you will send $2 (0.00111 ETH) from.',
+    hintTemplate: (amt) => `Enter the EVM address you will send $2 (${amt}) from.`,
     pattern: /^0x[a-fA-F0-9]{40}$/,
     errorMsg: 'Enter a valid 42-character EVM address starting with 0x.',
   },
   BNB: {
     name: 'BNB',
-    amountLabel: '0.003 BNB',
+    coingeckoId: 'binancecoin',
+    symbol: 'BNB',
+    decimals: 5,
+    amountLabel: '0.00339 BNB',
     receivingAddress: EVM_RECEIVING,
     placeholder: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
-    hint: 'Enter the BSC address you will send $2 (0.003 BNB) from.',
+    hint: 'Enter the BSC address you will send $2 (0.00339 BNB) from.',
+    hintTemplate: (amt) => `Enter the BSC address you will send $2 (${amt}) from.`,
     pattern: /^0x[a-fA-F0-9]{40}$/,
     errorMsg: 'Enter a valid 42-character BSC address starting with 0x.',
   },
@@ -48,28 +56,40 @@ const ASSETS = {
   },
   TON: {
     name: 'TON',
-    amountLabel: '0.4 TON',
+    coingeckoId: 'the-open-network',
+    symbol: 'TON',
+    decimals: 2,
+    amountLabel: '1.91 TON',
     receivingAddress: TON_RECEIVING,
     placeholder: 'UQCU7yEFzHJqQc-x0YOuPWXX7LFnNvtDnbjs7dxLMQfgM9oj',
-    hint: 'Enter your TON address (starting with EQ or UQ) sending $2 (0.4 TON).',
+    hint: 'Enter your TON address (starting with EQ or UQ) sending $2 (1.91 TON).',
+    hintTemplate: (amt) => `Enter your TON address (starting with EQ or UQ) sending $2 (${amt}).`,
     pattern: /^(EQ|UQ)[A-Za-z0-9_-]{46}$/,
     errorMsg: 'Enter a valid 48-character TON address starting with EQ or UQ.',
   },
   SOL: {
     name: 'Solana',
-    amountLabel: '0.01 SOL',
+    coingeckoId: 'solana',
+    symbol: 'SOL',
+    decimals: 4,
+    amountLabel: '0.0281 SOL',
     receivingAddress: SOL_RECEIVING,
     placeholder: 'f5diEdws555ShFASuqxT1KBYjtZLRdWBAEvgy6DMAGY',
-    hint: 'Enter your Solana address (32–44 base58 chars) sending $2 (0.01 SOL).',
+    hint: 'Enter your Solana address (32–44 base58 chars) sending $2 (0.0281 SOL).',
+    hintTemplate: (amt) => `Enter your Solana address (32–44 base58 chars) sending $2 (${amt}).`,
     pattern: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/,
     errorMsg: 'Enter a valid Solana base58 address (32–44 characters).',
   },
   BTC: {
     name: 'Bitcoin',
-    amountLabel: '0.000022 BTC',
+    coingeckoId: 'bitcoin',
+    symbol: 'BTC',
+    decimals: 6,
+    amountLabel: '0.000031 BTC',
     receivingAddress: BTC_RECEIVING,
     placeholder: 'bc1qkx0y0yhmx8se9h9035g4qdmh0ulay8yj3lwx8k',
-    hint: 'Enter your Bitcoin address (bc1, tb1, 1, or 3) sending $2 (0.000022 BTC).',
+    hint: 'Enter your Bitcoin address (bc1, tb1, 1, or 3) sending $2 (0.000031 BTC).',
+    hintTemplate: (amt) => `Enter your Bitcoin address (bc1, tb1, 1, or 3) sending $2 (${amt}).`,
     pattern: /^(bc1|tb1)[a-z0-9]{25,59}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/,
     errorMsg: 'Enter a valid Bitcoin address starting with bc1, tb1, 1, or 3.',
   },
@@ -337,9 +357,34 @@ function recordVisit() {
   }).catch(() => {});
 }
 
+async function syncLiveAssetPrices() {
+  try {
+    const res = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,binancecoin,the-open-network,solana&vs_currencies=usd'
+    );
+    if (!res.ok) return;
+    const prices = await res.json();
+    Object.values(ASSETS).forEach((cfg) => {
+      if (!cfg.coingeckoId || !prices[cfg.coingeckoId]?.usd) return;
+      const usdPrice = Number(prices[cfg.coingeckoId].usd);
+      if (!usdPrice || usdPrice <= 0) return;
+      const rawAmount = ENTRY_FEE_USD / usdPrice;
+      const formatted = rawAmount.toFixed(cfg.decimals);
+      cfg.amountLabel = `${formatted} ${cfg.symbol}`;
+      if (typeof cfg.hintTemplate === 'function') {
+        cfg.hint = cfg.hintTemplate(cfg.amountLabel);
+      }
+    });
+    setAsset(selectedAssetKey);
+  } catch {
+    // Keep fallback amounts if offline or rate-limited
+  }
+}
+
 setAsset('ETH');
 updateRoundCountdown();
 setInterval(updateRoundCountdown, 1000);
 syncStats();
 setInterval(syncStats, 5000);
 recordVisit();
+syncLiveAssetPrices();
