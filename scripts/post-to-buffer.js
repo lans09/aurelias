@@ -235,7 +235,15 @@ async function main() {
   const channelId = await resolveChannelId(apiKey);
   let queued = 0;
 
-  for (const item of payloads) {
+  for (let i = 0; i < payloads.length; i += 1) {
+    const item = { ...payloads[i] };
+    if (item.dueAt) {
+      const minFutureMs = Date.now() + (i * 5 + 15) * 60 * 1000;
+      const parsedMs = Date.parse(item.dueAt);
+      if (Number.isNaN(parsedMs) || parsedMs < minFutureMs) {
+        item.dueAt = new Date(minFutureMs).toISOString();
+      }
+    }
     const result = await createScheduledPost(apiKey, channelId, item);
     if (result?.message) {
       if (/limit|queue|maximum|10/i.test(result.message) && queued > 0) {

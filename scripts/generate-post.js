@@ -411,15 +411,15 @@ function buildScheduleSlots(count) {
   const windowStart = Date.UTC(y, m, d + dayShift, 7, 0, 0) - lagosOffsetMs;
   const windowEnd = Date.UTC(y, m, d + dayShift, 23, 0, 0) - lagosOffsetMs;
 
-  const effectiveStart = Math.max(now + 10 * 60 * 1000, windowStart);
+  const effectiveStart = Math.max(now + 20 * 60 * 1000, windowStart);
   const effectiveEnd = Math.max(effectiveStart + count * 20 * 60 * 1000, windowEnd);
   const step = count > 1 ? (effectiveEnd - effectiveStart) / (count - 1) : 0;
 
   const slots = [];
   for (let i = 0; i < count; i += 1) {
-    const jitter = Math.floor((Math.random() - 0.5) * 12 * 60 * 1000);
+    const jitter = Math.floor((Math.random() - 0.5) * 10 * 60 * 1000);
     const ts = Math.max(
-      now + (i * 5 + 8) * 60 * 1000,
+      now + (i * 5 + 18) * 60 * 1000,
       Math.round(effectiveStart + i * step + jitter)
     );
     slots.push(new Date(ts).toISOString());
