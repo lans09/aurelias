@@ -1,7 +1,13 @@
-const IMAGE_BASE_URL = (
-  process.env.IMAGE_BASE_URL ||
-  'https://raw.githubusercontent.com/lans09/aurelias/main/assets/social'
+const fs = require('node:fs');
+const path = require('node:path');
+
+const DEFAULT_SITE_URL = 'https://www.evmsync.live/';
+const RAW_BASE_URL = (
+  process.env.RAW_BASE_URL ||
+  'https://raw.githubusercontent.com/lans09/aurelias/main'
 ).replace(/\/$/, '');
+
+const IMAGE_BASE_URL = `${RAW_BASE_URL}/assets/social`;
 
 const POST_THEMES = [
   {
@@ -56,7 +62,7 @@ function buildPost(siteUrl) {
   const opener = theme.openers[Math.floor(Math.random() * theme.openers.length)];
   const body = theme.bodies[Math.floor(Math.random() * theme.bodies.length)];
   const cta = CTAS[Math.floor(Math.random() * CTAS.length)];
-  const url = siteUrl || 'https://your-site.vercel.app';
+  const url = siteUrl || DEFAULT_SITE_URL;
 
   let text = `${opener} ${body} ${cta} ${url}`;
   if (text.length > 275) {
@@ -66,6 +72,21 @@ function buildPost(siteUrl) {
     text,
     imageUrl: `${IMAGE_BASE_URL}/${theme.image}`,
   };
+}
+
+function loadPostPayload(siteUrl) {
+  const generatedFile = path.join(__dirname, '..', '.generated-post.json');
+  if (fs.existsSync(generatedFile)) {
+    const data = JSON.parse(fs.readFileSync(generatedFile, 'utf8'));
+    if (data?.text && data?.imagePath) {
+      const cleanPath = String(data.imagePath).replace(/^\/+/, '');
+      return {
+        text: data.text,
+        imageUrl: `${RAW_BASE_URL}/${cleanPath}`,
+      };
+    }
+  }
+  return buildPost(siteUrl);
 }
 
 async function bufferGraphQL(apiKey, query, variables = {}) {
@@ -136,8 +157,8 @@ async function resolveChannelId(apiKey) {
 async function main() {
   const isPreview = process.argv.includes('--preview');
   const apiKey = (process.env.BUFFER_API_KEY || '').trim();
-  const siteUrl = (process.env.SITE_URL || '').trim();
-  const { text, imageUrl } = buildPost(siteUrl);
+  const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim();
+  const { text, imageUrl } = loadPostPayload(siteUrl);
 
   if (isPreview) {
     console.log(JSON.stringify({ text, imageUrl }, null, 2));
