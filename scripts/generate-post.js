@@ -460,14 +460,12 @@ async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview,
 
   let imagePath = pickUnusedPoolImage(pillar.isPromo, history);
   let imageSource = 'curated-pool';
-  if (!isPreview) {
-    if (apiKey) {
-      try {
-        imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
-        imageSource = 'gemini-2.5-flash-image';
-      } catch (err) {
-        console.warn('Gemini image generation failed, using curated pool:', err.message);
-      }
+  if (!isPreview && apiKey && process.env.USE_GEMINI_IMAGES === '1') {
+    try {
+      imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
+      imageSource = 'gemini-2.5-flash-image';
+    } catch (err) {
+      console.warn('Gemini image generation failed, using curated pool:', err.message);
     }
   }
 
