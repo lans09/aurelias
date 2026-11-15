@@ -2,8 +2,8 @@ name: Daily Buffer Posts
 
 on:
   schedule:
-    # 6x daily: 08:00, 11:00, 14:00, 17:00, 20:00, and 23:00 Africa/Lagos (UTC+1)
-    - cron: '0 7,10,13,16,19,22 * * *'
+    # 8x daily (safe anti-shadowban ceiling): 07:00 to 21:00 every 2h Africa/Lagos (UTC+1)
+    - cron: '0 6,8,10,12,14,16,18,20 * * *'
   workflow_dispatch:
 
 jobs:
@@ -33,13 +33,13 @@ jobs:
           SITE_URL: ${{ secrets.SITE_URL || 'https://www.evmsync.live/' }}
         run: node scripts/generate-post.js
 
-      - name: Publish generated image to repo for Buffer CDN
+      - name: Publish generated image and post history to repo
         run: |
-          if [ -d "assets/social/generated" ] && [ -n "$(git status --porcelain assets/social/generated)" ]; then
+          if [ -n "$(git status --porcelain assets/social)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add assets/social/generated
-            git commit -m "chore: update generated social visual [skip ci]"
+            git add assets/social
+            git commit -m "chore: update generated social visual and post history [skip ci]"
             git push
           fi
 
