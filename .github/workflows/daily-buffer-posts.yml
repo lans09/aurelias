@@ -27,8 +27,9 @@ jobs:
           echo "Sleeping ${DELAY}s for randomized posting time..."
           sleep "$DELAY"
 
-      - name: Send post to Buffer webhook
+      - name: Send post directly to Buffer GraphQL API
         env:
-          BUFFER_WEBHOOK_URL: ${{ secrets.BUFFER_WEBHOOK_URL }}
+          BUFFER_API_KEY: ${{ secrets.BUFFER_API_KEY }}
+          BUFFER_CHANNEL_ID: ${{ secrets.BUFFER_CHANNEL_ID }}
           SITE_URL: ${{ secrets.SITE_URL }}
         run: node scripts/post-to-buffer.js

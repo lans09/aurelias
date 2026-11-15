@@ -1,6 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
 const OPENERS = [
   'AURELIAS Season 04 is open.',
   '36 winners share 50,000 USDC in Season 04.',
@@ -39,33 +36,97 @@ function buildPost(siteUrl) {
   return text;
 }
 
-async function main() {
-  const webhookUrl = process.env.BUFFER_WEBHOOK_URL;
-  const siteUrl = (process.env.SITE_URL || '').trim();
-
-  if (!webhookUrl) {
-    throw new Error('Missing BUFFER_WEBHOOK_URL secret.');
-  }
-
-  const text = buildPost(siteUrl);
-  const payload = {
-    text,
-    scheduled_at: new Date().toISOString(),
-    source: 'aurelias-github-actions',
-  };
-
-  const res = await fetch(webhookUrl, {
+async function bufferGraphQL(apiKey, query, variables = {}) {
+  const res = await fetch('https://api.buffer.com', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({ query, variables }),
   });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Webhook failed (${res.status}): ${errText}`);
+  const json = await res.json();
+  if (!res.ok || json.errors) {
+    throw new Error(`Buffer GraphQL error (${res.status}): ${JSON.stringify(json.errors || json)}`);
+  }
+  return json.data;
+}
+
+async function resolveChannelId(apiKey) {
+  if (process.env.BUFFER_CHANNEL_ID) {
+    return process.env.BUFFER_CHANNEL_ID.trim();
   }
 
-  console.log('Successfully sent post to Buffer webhook:', text);
+  const data = await bufferGraphQL(
+    apiKey,
+    `query GetChannels {
+      account {
+        organizations {
+          channels {
+            id
+            name
+            service
+          }
+        }
+      }
+    }`
+  );
+
+  const orgs = data?.account?.organizations || [];
+  const channels = orgs.flatMap((o) => o.channels || []);
+  if (channels.length === 0) {
+    throw new Error('No connected channels found in Buffer account.');
+  }
+
+  const twitter = channels.find((c) => /twitter|x/i.test(c.service || ''));
+  return (twitter || channels[0]).id;
+}
+
+async function main() {
+  const apiKey = (process.env.BUFFER_API_KEY || '').trim();
+  const siteUrl = (process.env.SITE_URL || '').trim();
+
+  if (!apiKey) {
+    throw new Error('Missing BUFFER_API_KEY secret.');
+  }
+
+  const channelId = await resolveChannelId(apiKey);
+  const text = buildPost(siteUrl);
+
+  const data = await bufferGraphQL(
+    apiKey,
+    `mutation CreateNewPost($input: CreatePostInput!) {
+      createPost(input: $input) {
+        ... on PostActionSuccess {
+          post {
+            id
+            text
+            status
+          }
+        }
+        ... on MutationError {
+          message
+          code
+        }
+      }
+    }`,
+    {
+      input: {
+        text,
+        channelId,
+        schedulingType: 'automatic',
+        mode: 'addToQueue',
+      },
+    }
+  );
+
+  const result = data?.createPost;
+  if (result?.message) {
+    throw new Error(`Buffer rejected post (${result.code || 'ERROR'}): ${result.message}`);
+  }
+
+  console.log('Successfully queued post in Buffer:', result?.post || text);
 }
 
 main().catch((err) => {
