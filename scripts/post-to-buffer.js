@@ -58,25 +58,38 @@ async function resolveChannelId(apiKey) {
     return process.env.BUFFER_CHANNEL_ID.trim();
   }
 
-  const data = await bufferGraphQL(
+  const orgData = await bufferGraphQL(
     apiKey,
-    `query GetChannels {
+    `query GetOrganizations {
       account {
         organizations {
-          channels {
-            id
-            name
-            service
-          }
+          id
+          name
         }
       }
     }`
   );
 
-  const orgs = data?.account?.organizations || [];
-  const channels = orgs.flatMap((o) => o.channels || []);
+  const orgs = orgData?.account?.organizations || [];
+  if (orgs.length === 0) {
+    throw new Error('No organizations found in Buffer account.');
+  }
+
+  const channelsData = await bufferGraphQL(
+    apiKey,
+    `query GetChannels($orgId: OrganizationId!) {
+      channels(input: { organizationId: $orgId }) {
+        id
+        name
+        service
+      }
+    }`,
+    { orgId: orgs[0].id }
+  );
+
+  const channels = channelsData?.channels || [];
   if (channels.length === 0) {
-    throw new Error('No connected channels found in Buffer account.');
+    throw new Error('No connected channels found in Buffer organization.');
   }
 
   const twitter = channels.find((c) => /twitter|x/i.test(c.service || ''));
