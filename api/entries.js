@@ -16,12 +16,18 @@ function getKvConfig() {
 async function readEntries() {
   const kv = getKvConfig();
   if (kv) {
-    const res = await fetch(`${kv.url}/get/${encodeURIComponent(KV_KEY)}`, {
-      headers: { Authorization: `Bearer ${kv.token}` },
+    const res = await fetch(kv.url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${kv.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(['GET', KV_KEY]),
     });
     const data = await res.json();
     if (!data || !data.result) return [];
-    return typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+    const parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result;
+    return Array.isArray(parsed) ? parsed : [];
   }
 
   try {
@@ -35,14 +41,17 @@ async function readEntries() {
 async function writeEntries(entries) {
   const kv = getKvConfig();
   if (kv) {
-    await fetch(`${kv.url}/set/${encodeURIComponent(KV_KEY)}`, {
+    const res = await fetch(kv.url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${kv.token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(JSON.stringify(entries)),
+      body: JSON.stringify(['SET', KV_KEY, JSON.stringify(entries)]),
     });
+    if (!res.ok) {
+      throw new Error(`Upstash write failed (${res.status})`);
+    }
     return;
   }
 

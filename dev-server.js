@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const entriesHandler = require('./api/entries');
 
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const ROOT = __dirname;
 const MIME = {
   '.html': 'text/html; charset=utf-8',
