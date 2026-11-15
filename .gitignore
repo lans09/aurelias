@@ -3,3 +3,4 @@
 .vercel
 buffer-daily-posts.csv
 .generated-post.json
+.generated-batch.json

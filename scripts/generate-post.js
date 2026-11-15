@@ -343,13 +343,46 @@ function pruneOldGeneratedImages(maxAgeDays = 14) {
   }
 }
 
-async function main() {
-  const isPreview = process.argv.includes('--preview');
-  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-  const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim() || DEFAULT_SITE_URL;
-  const history = loadHistory();
-  const timing = getTimingContext();
+function getCountArg() {
+  const idx = process.argv.indexOf('--count');
+  if (idx !== -1 && process.argv[idx + 1]) {
+    const parsed = Number.parseInt(process.argv[idx + 1], 10);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.min(parsed, 10);
+  }
+  const envCount = Number.parseInt(process.env.POST_COUNT || '1', 10);
+  return Number.isFinite(envCount) && envCount > 0 ? Math.min(envCount, 10) : 1;
+}
 
+function buildScheduleSlots(count) {
+  const now = Date.now();
+  const lagosOffsetMs = 60 * 60 * 1000; // UTC+1
+  const nowLagos = new Date(now + lagosOffsetMs);
+  const y = nowLagos.getUTCFullYear();
+  const m = nowLagos.getUTCMonth();
+  const d = nowLagos.getUTCDate();
+
+  // Window: 07:00 to 23:00 Africa/Lagos today (or tomorrow if past 22:00 Lagos)
+  let dayShift = nowLagos.getUTCHours() >= 22 ? 1 : 0;
+  const windowStart = Date.UTC(y, m, d + dayShift, 7, 0, 0) - lagosOffsetMs;
+  const windowEnd = Date.UTC(y, m, d + dayShift, 23, 0, 0) - lagosOffsetMs;
+
+  const effectiveStart = Math.max(now + 10 * 60 * 1000, windowStart);
+  const effectiveEnd = Math.max(effectiveStart + count * 20 * 60 * 1000, windowEnd);
+  const step = count > 1 ? (effectiveEnd - effectiveStart) / (count - 1) : 0;
+
+  const slots = [];
+  for (let i = 0; i < count; i += 1) {
+    const jitter = Math.floor((Math.random() - 0.5) * 12 * 60 * 1000);
+    const ts = Math.max(
+      now + (i * 5 + 8) * 60 * 1000,
+      Math.round(effectiveStart + i * step + jitter)
+    );
+    slots.push(new Date(ts).toISOString());
+  }
+  return slots;
+}
+
+async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt }) {
   const pillar = pickWeightedPillar();
   const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
 
@@ -371,7 +404,6 @@ async function main() {
   let imageSource = 'fallback-static';
   if (apiKey && !isPreview) {
     try {
-      pruneOldGeneratedImages(14);
       imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
       imageSource = 'gemini-2.5-flash-image';
     } catch (err) {
@@ -379,7 +411,7 @@ async function main() {
     }
   }
 
-  const output = {
+  return {
     pillar: pillar.id,
     isPromo: pillar.isPromo,
     text: post.text,
@@ -387,22 +419,47 @@ async function main() {
     score: post.score || null,
     imagePrompt: post.imagePrompt,
     imagePath,
+    dueAt,
     copySource,
     imageSource,
   };
+}
+
+async function main() {
+  const isPreview = process.argv.includes('--preview');
+  const count = getCountArg();
+  const apiKey = (process.env.GEMINI_API_KEY || '').trim();
+  const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim() || DEFAULT_SITE_URL;
+  let history = loadHistory();
+  const timing = getTimingContext();
+  const slots = buildScheduleSlots(count);
 
   if (!isPreview) {
-    saveHistory(history, {
-      at: new Date().toISOString(),
-      pillar: pillar.id,
-      angle: post.angle,
-      text: post.text,
-    });
-    const outPath = path.join(__dirname, '..', '.generated-post.json');
-    fs.writeFileSync(outPath, JSON.stringify(output, null, 2));
+    pruneOldGeneratedImages(14);
   }
 
-  console.log(JSON.stringify(output, null, 2));
+  const batch = [];
+  for (let i = 0; i < count; i += 1) {
+    const item = await generateSinglePost({
+      apiKey,
+      siteUrl,
+      history,
+      timing,
+      isPreview,
+      dueAt: slots[i],
+    });
+    batch.push(item);
+    history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, text: item.text }].slice(-15);
+  }
+
+  if (!isPreview) {
+    fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+    fs.writeFileSync(path.join(__dirname, '..', '.generated-post.json'), JSON.stringify(batch[0], null, 2));
+    fs.writeFileSync(path.join(__dirname, '..', '.generated-batch.json'), JSON.stringify(batch, null, 2));
+  }
+
+  console.log(JSON.stringify(count === 1 ? batch[0] : batch, null, 2));
 }
 
 main().catch((err) => {

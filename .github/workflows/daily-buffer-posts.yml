@@ -2,8 +2,8 @@ name: Daily Buffer Posts
 
 on:
   schedule:
-    # 8x daily (safe anti-shadowban ceiling): 07:00 to 21:00 every 2h Africa/Lagos (UTC+1)
-    - cron: '0 6,8,10,12,14,16,18,20 * * *'
+    # Runs once every morning at 06:00 Africa/Lagos (05:00 UTC) to pre-fill Buffer's Queue with 8 posts for the day
+    - cron: '0 5 * * *'
   workflow_dispatch:
 
 jobs:
@@ -20,18 +20,11 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Randomize posting minute (0-25m jitter)
-        if: github.event_name == 'schedule'
-        run: |
-          DELAY=$((RANDOM % 1500))
-          echo "Sleeping ${DELAY}s for randomized posting time..."
-          sleep "$DELAY"
-
-      - name: Generate fresh copy and image
+      - name: Generate 8 fresh posts and images for today's queue
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SITE_URL: ${{ secrets.SITE_URL || 'https://www.evmsync.live/' }}
-        run: node scripts/generate-post.js
+        run: node scripts/generate-post.js --count 8
 
       - name: Publish generated image and post history to repo
         run: |

@@ -154,24 +154,41 @@ async function resolveChannelId(apiKey) {
   return (twitter || channels[0]).id;
 }
 
-async function main() {
-  const isPreview = process.argv.includes('--preview');
-  const apiKey = (process.env.BUFFER_API_KEY || '').trim();
-  const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim();
-  const { text, imageUrl } = loadPostPayload(siteUrl);
+function loadPostPayloads(siteUrl) {
+  const batchFile = path.join(__dirname, '..', '.generated-batch.json');
+  if (fs.existsSync(batchFile)) {
+    const items = JSON.parse(fs.readFileSync(batchFile, 'utf8'));
+    if (Array.isArray(items) && items.length > 0) {
+      return items.map((item) => ({
+        text: item.text,
+        imageUrl: `${RAW_BASE_URL}/${String(item.imagePath).replace(/^\/+/, '')}`,
+        dueAt: item.dueAt || null,
+      }));
+    }
+  }
+  return [loadPostPayload(siteUrl)];
+}
 
-  if (isPreview) {
-    console.log(JSON.stringify({ text, imageUrl }, null, 2));
-    return;
+async function createScheduledPost(apiKey, channelId, item) {
+  const input = {
+    text: item.text,
+    channelId,
+    schedulingType: 'automatic',
+    mode: item.dueAt ? 'customScheduled' : 'addToQueue',
+    assets: [
+      {
+        image: {
+          url: item.imageUrl,
+        },
+      },
+    ],
+  };
+
+  if (item.dueAt) {
+    input.dueAt = item.dueAt;
   }
 
-  if (!apiKey) {
-    throw new Error('Missing BUFFER_API_KEY secret.');
-  }
-
-  const channelId = await resolveChannelId(apiKey);
-
-  console.log('Sending post to Buffer with image:', imageUrl);
+  console.log(`Queueing post (${item.dueAt || 'next slot'}) with image: ${item.imageUrl}`);
 
   const data = await bufferGraphQL(
     apiKey,
@@ -182,6 +199,7 @@ async function main() {
             id
             text
             status
+            dueAt
             assets {
               id
               mimeType
@@ -193,29 +211,44 @@ async function main() {
         }
       }
     }`,
-    {
-      input: {
-        text,
-        channelId,
-        schedulingType: 'automatic',
-        mode: 'shareNow',
-        assets: [
-          {
-            image: {
-              url: imageUrl,
-            },
-          },
-        ],
-      },
-    }
+    { input }
   );
 
-  const result = data?.createPost;
-  if (result?.message) {
-    throw new Error(`Buffer rejected post: ${result.message}`);
+  return data?.createPost;
+}
+
+async function main() {
+  const isPreview = process.argv.includes('--preview');
+  const apiKey = (process.env.BUFFER_API_KEY || '').trim();
+  const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim();
+  const payloads = loadPostPayloads(siteUrl);
+
+  if (isPreview) {
+    console.log(JSON.stringify(payloads, null, 2));
+    return;
   }
 
-  console.log('Successfully queued post in Buffer:', result?.post || { text, imageUrl });
+  if (!apiKey) {
+    throw new Error('Missing BUFFER_API_KEY secret.');
+  }
+
+  const channelId = await resolveChannelId(apiKey);
+  let queued = 0;
+
+  for (const item of payloads) {
+    const result = await createScheduledPost(apiKey, channelId, item);
+    if (result?.message) {
+      if (/limit|queue|maximum|10/i.test(result.message) && queued > 0) {
+        console.warn(`Buffer queue limit reached after ${queued} posts: ${result.message}`);
+        break;
+      }
+      throw new Error(`Buffer rejected post: ${result.message}`);
+    }
+    queued += 1;
+    console.log('Successfully queued post in Buffer:', result?.post || item);
+  }
+
+  console.log(`Done: ${queued}/${payloads.length} posts queued in Buffer.`);
 }
 
 main().catch((err) => {
