@@ -75,21 +75,26 @@ async function resolveChannelId(apiKey) {
     throw new Error('No organizations found in Buffer account.');
   }
 
-  const channelsData = await bufferGraphQL(
-    apiKey,
-    `query GetChannels($orgId: OrganizationId!) {
-      channels(input: { organizationId: $orgId }) {
-        id
-        name
-        service
-      }
-    }`,
-    { orgId: orgs[0].id }
-  );
+  let channels = [];
+  for (const org of orgs) {
+    const channelsData = await bufferGraphQL(
+      apiKey,
+      `query GetChannels($orgId: OrganizationId!) {
+        channels(input: { organizationId: $orgId }) {
+          id
+          name
+          service
+        }
+      }`,
+      { orgId: org.id }
+    );
+    if (Array.isArray(channelsData?.channels)) {
+      channels = channels.concat(channelsData.channels);
+    }
+  }
 
-  const channels = channelsData?.channels || [];
   if (channels.length === 0) {
-    throw new Error('No connected channels found in Buffer organization.');
+    throw new Error('No connected channels found in Buffer. Connect your X/Twitter account in Buffer -> Channels.');
   }
 
   const twitter = channels.find((c) => /twitter|x/i.test(c.service || ''));
