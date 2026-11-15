@@ -171,6 +171,8 @@ async function main() {
 
   const channelId = await resolveChannelId(apiKey);
 
+  console.log('Sending post to Buffer with image:', imageUrl);
+
   const data = await bufferGraphQL(
     apiKey,
     `mutation CreateNewPost($input: CreatePostInput!) {
@@ -196,7 +198,7 @@ async function main() {
         text,
         channelId,
         schedulingType: 'automatic',
-        mode: 'addToQueue',
+        mode: 'shareNow',
         assets: [
           {
             image: {

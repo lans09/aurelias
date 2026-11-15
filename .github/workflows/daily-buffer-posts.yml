@@ -2,10 +2,8 @@ name: Daily Buffer Posts
 
 on:
   schedule:
-    # 09:00, 14:00, and 20:00 Africa/Lagos (UTC+1)
-    - cron: '0 8 * * *'
-    - cron: '0 13 * * *'
-    - cron: '0 19 * * *'
+    # 6x daily: 08:00, 11:00, 14:00, 17:00, 20:00, and 23:00 Africa/Lagos (UTC+1)
+    - cron: '0 7,10,13,16,19,22 * * *'
   workflow_dispatch:
 
 jobs:
@@ -22,10 +20,10 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Randomize posting minute (0-45m jitter)
+      - name: Randomize posting minute (0-25m jitter)
         if: github.event_name == 'schedule'
         run: |
-          DELAY=$((RANDOM % 2700))
+          DELAY=$((RANDOM % 1500))
           echo "Sleeping ${DELAY}s for randomized posting time..."
           sleep "$DELAY"
 
