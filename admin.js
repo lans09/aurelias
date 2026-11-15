@@ -9,7 +9,10 @@ const adminDashboard = document.getElementById('admin-dashboard');
 const adminPoolEl = document.getElementById('admin-pool');
 const adminPendingEl = document.getElementById('admin-pending-count');
 const adminConfirmedEl = document.getElementById('admin-confirmed-count');
+const adminTotalVisitsEl = document.getElementById('admin-total-visits');
+const adminUniqueVisitorsEl = document.getElementById('admin-unique-visitors');
 const entriesListEl = document.getElementById('entries-list');
+const visitsListEl = document.getElementById('visits-list');
 
 let adminKey = sessionStorage.getItem(ADMIN_KEY_STORAGE) || '';
 let pollTimer = null;
@@ -77,10 +80,47 @@ function renderEntries(data) {
     .join('');
 }
 
+async function fetchAdminVisits() {
+  const res = await fetch('/api/visit', {
+    headers: { 'x-admin-key': adminKey },
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+function renderVisits(visitData) {
+  if (!visitData) return;
+  if (adminTotalVisitsEl) adminTotalVisitsEl.textContent = String(visitData.totalVisits || 0);
+  if (adminUniqueVisitorsEl) adminUniqueVisitorsEl.textContent = String(visitData.uniqueVisitors || 0);
+  if (!visitsListEl) return;
+
+  const recent = Array.isArray(visitData.recent) ? visitData.recent : [];
+  if (recent.length === 0) {
+    visitsListEl.innerHTML = '<div class="empty-state">No site visits recorded yet.</div>';
+    return;
+  }
+
+  visitsListEl.innerHTML = recent
+    .map((v) => {
+      const timeStr = new Date(v.at).toLocaleString();
+      return `
+        <div class="entry-row">
+          <span class="mono-input">${escapeHtml(timeStr)}</span>
+          <span>${escapeHtml(v.location || 'Unknown')}</span>
+          <span>${escapeHtml(v.device || 'Other')}</span>
+          <span>${escapeHtml(v.source || 'Direct')}</span>
+          <div class="row-actions"><span class="mono-tag">${escapeHtml(v.visitorId || '')}</span></div>
+        </div>
+      `;
+    })
+    .join('');
+}
+
 async function refreshDashboard() {
   try {
-    const data = await fetchAdminEntries();
+    const [data, visitData] = await Promise.all([fetchAdminEntries(), fetchAdminVisits()]);
     renderEntries(data);
+    renderVisits(visitData);
   } catch (err) {
     if (pollTimer) clearInterval(pollTimer);
     sessionStorage.removeItem(ADMIN_KEY_STORAGE);

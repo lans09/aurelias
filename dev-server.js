@@ -2,6 +2,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const entriesHandler = require('./api/entries');
+const visitHandler = require('./api/visit');
 
 const PORT = process.env.PORT || 8080;
 const ROOT = __dirname;
@@ -11,6 +12,9 @@ const MIME = {
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
+  '.png': 'image/png',
 };
 
 const server = http.createServer((req, res) => {
@@ -18,6 +22,9 @@ const server = http.createServer((req, res) => {
 
   if (urlPath === '/api/entries') {
     return entriesHandler(req, res);
+  }
+  if (urlPath === '/api/visit') {
+    return visitHandler(req, res);
   }
 
   let filePath = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath === '/admin' ? 'admin.html' : urlPath);

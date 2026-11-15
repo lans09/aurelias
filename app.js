@@ -326,8 +326,20 @@ function updateRoundCountdown() {
   roundCountdownEl.textContent = `${hours}:${mins}:${secs}`;
 }
 
+function recordVisit() {
+  fetch('/api/visit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path: window.location.pathname || '/',
+      referrer: document.referrer || '',
+    }),
+  }).catch(() => {});
+}
+
 setAsset('ETH');
 updateRoundCountdown();
 setInterval(updateRoundCountdown, 1000);
 syncStats();
 setInterval(syncStats, 5000);
+recordVisit();
