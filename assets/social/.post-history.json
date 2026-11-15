@@ -1,11 +1,5 @@
 [
   {
-    "at": "2026-11-15T14:17:21.761Z",
-    "pillar": "aurelias_promo",
-    "angle": "60-Second Multi-Chain Entry",
-    "text": "57h remaining in the current 72h Season 04 window. 30 community winners take 500 USDC each in Season 04, alongside the 20,000 USDC grand prize. https://www.evmsync.live/"
-  },
-  {
     "at": "2026-11-15T14:17:21.949Z",
     "pillar": "psychology",
     "angle": "Patience in Markets",
@@ -46,5 +40,61 @@
     "pillar": "psychology",
     "angle": "Signal Over Noise",
     "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:03:35.957Z",
+    "pillar": "onchain",
+    "angle": "Speed vs Finality",
+    "imagePath": "assets/social/pool/organic-titanium-chronograph.jpg",
+    "text": "Quiet execution and clean design always outlast loud hype."
+  },
+  {
+    "at": "2026-11-15T16:06:59.070Z",
+    "pillar": "onchain",
+    "angle": "Speed vs Finality",
+    "imagePath": "assets/social/pool/organic-obsidian-prism.jpg",
+    "text": "A wire transfer takes three days not because data moves slowly, but because clearinghouses need time to manage counterparty risk. Cryptographic finality eliminates the delay by verifying state instantly. Architecture always beats bureaucracy."
+  },
+  {
+    "at": "2026-11-15T16:07:02.934Z",
+    "pillar": "psychology",
+    "angle": "Asymmetric Risk",
+    "imagePath": "assets/social/pool/organic-titanium-rings.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:07:06.479Z",
+    "pillar": "onchain",
+    "angle": "Stablecoin Settlement Reality",
+    "imagePath": "assets/social/pool/organic-obsidian-basalt.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:07:08.648Z",
+    "pillar": "fairness",
+    "angle": "Public Auditability",
+    "imagePath": "assets/social/pool/organic-obsidian-hero.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:10:19.365Z",
+    "pillar": "onchain",
+    "angle": "Multi-Chain UX Friction",
+    "imagePath": "assets/social/pool/organic-titanium-chronograph.jpg",
+    "text": "You never think about routing protocols when sending an email. Forcing everyday users to bridge assets and hold three native gas tokens just to move five dollars is bad product design. The plumbing has to disappear."
+  },
+  {
+    "at": "2026-11-15T16:10:21.552Z",
+    "pillar": "fairness",
+    "angle": "Why Trust Me Fails",
+    "imagePath": "assets/social/pool/organic-obsidian-prism.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:10:23.732Z",
+    "pillar": "onchain",
+    "angle": "Multi-Chain UX Friction",
+    "imagePath": "assets/social/pool/organic-titanium-rings.jpg",
+    "text": "Verifiable randomness matters because \"trust the backend\" is not a security model."
   }
 ]
