@@ -178,6 +178,15 @@ module.exports = async function handler(req, res) {
       return res.end(JSON.stringify({ ok: true }));
     }
 
+    if (req.method === 'DELETE') {
+      if (!isAdmin) {
+        res.statusCode = 401;
+        return res.end(JSON.stringify({ error: 'Unauthorized' }));
+      }
+      await writeVisitStore({ totalVisits: 0, uniqueIds: [], recent: [] });
+      return res.end(JSON.stringify({ ok: true, cleared: true }));
+    }
+
     res.statusCode = 405;
     return res.end(JSON.stringify({ error: 'Method not allowed' }));
   } catch (err) {

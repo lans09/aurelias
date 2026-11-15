@@ -14,6 +14,7 @@ const adminUniqueVisitorsEl = document.getElementById('admin-unique-visitors');
 const entriesListEl = document.getElementById('entries-list');
 const visitsListEl = document.getElementById('visits-list');
 const clearEntriesBtn = document.getElementById('clear-entries-btn');
+const clearVisitsBtn = document.getElementById('clear-visits-btn');
 
 if (clearEntriesBtn) {
   clearEntriesBtn.addEventListener('click', async () => {
@@ -27,6 +28,22 @@ if (clearEntriesBtn) {
       if (res.ok) await refreshDashboard();
     } finally {
       clearEntriesBtn.disabled = false;
+    }
+  });
+}
+
+if (clearVisitsBtn) {
+  clearVisitsBtn.addEventListener('click', async () => {
+    if (!adminKey) return;
+    clearVisitsBtn.disabled = true;
+    try {
+      const res = await fetch('/api/visit', {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey },
+      });
+      if (res.ok) await refreshDashboard();
+    } finally {
+      clearVisitsBtn.disabled = false;
     }
   });
 }
