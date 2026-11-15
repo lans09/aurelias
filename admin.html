@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AURELIAS | Admin Verification</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .admin-main { padding: 48px 0 64px; }
+    .admin-top {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      margin-bottom: 36px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--hairline);
+    }
+    .admin-title {
+      font-family: var(--font-serif);
+      font-size: 40px;
+      font-weight: 500;
+      line-height: 1.1;
+    }
+    .auth-box {
+      max-width: 420px;
+      background: rgba(13, 13, 16, 0.88);
+      border: 1px solid var(--hairline-strong);
+      padding: 28px;
+    }
+    .entries-section { margin-top: 32px; }
+    .section-subhead {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+    .entry-row {
+      display: grid;
+      grid-template-columns: 1.5fr 0.8fr 0.8fr 0.8fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--hairline);
+      font-size: 13px;
+    }
+    .entry-row-head {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      letter-spacing: 0.12em;
+      color: var(--dim);
+      padding: 8px 0;
+      border-top: 1px solid var(--hairline);
+    }
+    .badge-pending { color: var(--amber); font-family: var(--font-mono); font-size: 11px; }
+    .badge-confirmed { color: var(--lime-bright); font-family: var(--font-mono); font-size: 11px; }
+    .badge-rejected { color: var(--danger); font-family: var(--font-mono); font-size: 11px; }
+    .row-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .empty-state { padding: 28px 0; color: var(--dim); font-size: 13.5px; }
+    @media (max-width: 820px) {
+      .admin-main { padding: 28px 0 48px; }
+      .admin-title { font-size: 32px; }
+      .auth-box { padding: 20px 16px; }
+      .entry-row { grid-template-columns: 1fr; gap: 8px; }
+      .entry-row-head { display: none; }
+      .row-actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="brand" aria-label="Aurelias Raffle Home">
+        <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="2.75" y="2.75" width="18.5" height="18.5" stroke="currentColor" stroke-width="1.35" />
+          <path d="M6.5 17.5L12 6.5L17.5 17.5" stroke="#84CC16" stroke-width="1.35" stroke-linecap="square" />
+          <line x1="8.5" y1="13.5" x2="15.5" y2="13.5" stroke="currentColor" stroke-width="1.25" />
+        </svg>
+        <span class="brand-name">AURELIAS</span>
+      </a>
+      <a href="/" class="btn-outline">Back to Raffle</a>
+    </div>
+  </header>
+
+  <main class="admin-main">
+    <div class="container">
+      <!-- Auth Gate -->
+      <div id="auth-gate" class="auth-box">
+        <p class="eyebrow">ADMIN CONSOLE</p>
+        <h1 class="confirmed-title">Verify Payments</h1>
+        <p class="field-hint" style="margin-bottom: 16px;">
+          Enter your admin passcode (default local demo key: <code>admin123</code>, or set <code>ADMIN_KEY</code> on Vercel).
+        </p>
+        <form id="auth-form">
+          <div class="field-group">
+            <label for="admin-key" class="field-label">Admin Passcode</label>
+            <input id="admin-key" type="password" class="field-input mono-input" placeholder="••••••••" required />
+          </div>
+          <div id="auth-error" class="form-error" hidden></div>
+          <button type="submit" class="btn-lime btn-full">Unlock Admin</button>
+        </form>
+      </div>
+
+      <!-- Admin Dashboard -->
+      <div id="admin-dashboard" hidden>
+        <div class="admin-top">
+          <div>
+            <p class="eyebrow">ADMIN CONSOLE · LIVE</p>
+            <h1 class="admin-title">Payment Verification</h1>
+          </div>
+          <div class="stats-row" style="margin-bottom: 0;">
+            <div class="stat-item">
+              <div class="stat-value stat-value--pool" id="admin-pool">50,000 USDC</div>
+              <div class="stat-label">Total Pool</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="admin-pending-count">0</div>
+              <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="admin-confirmed-count">0</div>
+              <div class="stat-label">Confirmed</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="entries-section">
+          <div class="section-subhead">ALL SUBMISSIONS (AUTO-REFRESHES EVERY 3S)</div>
+          <div class="entry-row entry-row-head">
+            <span>SENDER WALLET</span>
+            <span>TELEGRAM</span>
+            <span>ASSET / FEE</span>
+            <span>STATUS</span>
+            <span style="text-align:right;">ACTION</span>
+          </div>
+          <div id="entries-list"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

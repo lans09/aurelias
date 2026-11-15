@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AURELIAS | Decentralized On-Chain Raffle</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="/" class="brand" aria-label="Aurelias Raffle Home">
+        <svg class="brand-mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <rect x="2.75" y="2.75" width="18.5" height="18.5" stroke="currentColor" stroke-width="1.35" />
+          <path d="M6.5 17.5L12 6.5L17.5 17.5" stroke="#84CC16" stroke-width="1.35" stroke-linecap="square" />
+          <line x1="8.5" y1="13.5" x2="15.5" y2="13.5" stroke="currentColor" stroke-width="1.25" />
+        </svg>
+        <span class="brand-name">AURELIAS</span>
+      </a>
+
+      <div class="ambient-pill" role="status" aria-live="polite">
+        <span class="pill-dot" id="state-dot" aria-hidden="true"></span>
+        <span id="state-pill">ROUND OPEN</span>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="container hero-grid">
+        <!-- Left: Editorial Copy & Borderless Live Stats -->
+        <div class="hero-copy">
+          <p class="eyebrow">SEASON 04 · ON-CHAIN RAFFLE</p>
+          <h1 class="hero-title">
+            Enter your address.<br />
+            Join the <em>Season 04</em> draw.
+          </h1>
+          <p class="hero-subtitle">
+            Enter the <strong>50,000 USDC</strong> Season 04 tiered pool with a $2 entry fee in ETH,
+            BNB, USDT, TON, Solana, or Bitcoin within 15 minutes.
+          </p>
+
+          <!-- Borderless Tabular Live Stats -->
+          <div class="stats-row" aria-label="Live Raffle Metrics">
+            <div class="stat-item">
+              <div class="stat-value stat-value--pool" id="stat-pool">50,000 USDC</div>
+              <div class="stat-label">Total Pool</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="stat-fee">$2</div>
+              <div class="stat-label">Entry Fee</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="round-countdown">71:59:59</div>
+              <div class="stat-label">Remaining</div>
+            </div>
+          </div>
+
+          <div class="recent-winner-line">
+            <span class="winner-label">PLAYERS: <strong id="stat-players">7</strong></span>
+            <span class="winner-label">·</span>
+            <span class="winner-label">RECENT WINNER</span>
+            <span class="winner-value mono-input" id="stat-winner">None yet</span>
+          </div>
+        </div>
+
+        <!-- Right: 2-Step Payment & Receiving Dialog -->
+        <div class="entry-surface">
+          <!-- Step 1: Enter Sender Wallet -->
+          <div id="step-register">
+            <div class="surface-head">
+              <span class="mono-tag">ENTER RAFFLE DRAW</span>
+              <span class="mono-tag">FEE · $2 (<span id="head-asset-amt">0.001 ETH</span>)</span>
+            </div>
+
+            <form id="register-form" novalidate>
+              <div class="field-group">
+                <span class="field-label">Select Payment Asset</span>
+                <div class="asset-pills" role="radiogroup" aria-label="Payment Asset">
+                  <button type="button" class="asset-pill is-active" data-asset="ETH" aria-pressed="true">ETH</button>
+                  <button type="button" class="asset-pill" data-asset="BNB" aria-pressed="false">BNB</button>
+                  <button type="button" class="asset-pill" data-asset="USDT_EVM" aria-pressed="false">USDT (ETH/BNB)</button>
+                  <button type="button" class="asset-pill" data-asset="USDT_SOL" aria-pressed="false">USDT (SOL)</button>
+                  <button type="button" class="asset-pill" data-asset="TON" aria-pressed="false">TON</button>
+                  <button type="button" class="asset-pill" data-asset="SOL" aria-pressed="false">Solana</button>
+                  <button type="button" class="asset-pill" data-asset="BTC" aria-pressed="false">Bitcoin</button>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label for="sender-address" class="field-label">Your Sending Wallet Address</label>
+                <input
+                  id="sender-address"
+                  type="text"
+                  class="field-input mono-input"
+                  placeholder="0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
+                  autocomplete="off"
+                  spellcheck="false"
+                  required
+                />
+                <p class="field-hint" id="address-hint">
+                  Enter the EVM address you will send <strong>$2 (0.001 ETH)</strong> from.
+                </p>
+              </div>
+
+              <div class="field-group">
+                <label for="telegram-handle" class="field-label">Telegram Handle <span class="optional">(Optional)</span></label>
+                <input
+                  id="telegram-handle"
+                  type="text"
+                  class="field-input"
+                  placeholder="@username"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="form-error" id="form-error" role="alert" hidden></div>
+
+              <button type="submit" class="btn-lime btn-full" id="proceed-btn">
+                Proceed to Payment ($2)
+              </button>
+            </form>
+          </div>
+
+          <!-- Step 2: Receiving Money Dialog (15-Minute Window + QR) -->
+          <div id="step-receiving" hidden>
+            <div class="surface-head">
+              <div class="receiving-status">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                <span class="mono-tag receiving-label">RECEIVING MONEY</span>
+              </div>
+              <span class="mono-tag timer-badge" id="payment-timer">15:00</span>
+            </div>
+
+            <p class="receiving-desc">
+              Send <strong id="pending-amount">$2 (0.001 ETH)</strong> from
+              <span class="mono-input highlight-addr" id="pending-sender">0x...</span>
+              to the raffle address below before the 15-minute window expires.
+            </p>
+
+            <div class="qr-stage">
+              <div id="qr-container" class="qr-box" aria-label="Payment QR Code"></div>
+            </div>
+
+            <div class="field-group">
+              <span class="field-label" id="receiving-addr-label">Send $2 To This ETH Address</span>
+              <div class="copy-box">
+                <span class="mono-input copy-addr" id="receiving-address">
+                  0x610178dA211FEF7D417bC0e6FeD39F05609AD788
+                </span>
+                <button type="button" id="copy-address-btn" class="btn-outline btn-sm">Copy</button>
+              </div>
+            </div>
+
+            <div class="waiting-banner" id="waiting-banner">
+              Waiting for incoming payment confirmation...
+            </div>
+
+            <button type="button" id="cancel-payment-btn" class="btn-outline btn-full-outline">
+              Cancel Payment
+            </button>
+          </div>
+
+          <!-- Step 3: Confirmed Entry -->
+          <div id="step-confirmed" hidden>
+            <div class="surface-head">
+              <span class="mono-tag confirmed-badge">PAYMENT RECEIVED · IN DRAW</span>
+              <span class="mono-tag" id="confirmed-ticket">TKT-0001</span>
+            </div>
+            <h2 class="confirmed-title">You are inside the raffle.</h2>
+            <p class="confirmed-desc">
+              Your <strong id="confirmed-amount">$2</strong> payment from
+              <span class="mono-input highlight-addr" id="confirmed-sender">0x...</span>
+              has been confirmed. Good luck in the draw.
+            </p>
+            <button type="button" id="new-entry-btn" class="btn-outline btn-full-outline">
+              Enter Another Wallet
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tiered Prize & Draw Breakdown -->
+    <section class="tiers-section" aria-label="Prize Tiers">
+      <div class="container">
+        <div class="tiers-header">
+          <div>
+            <p class="eyebrow">SEASON 04 · PRIZE ARCHITECTURE</p>
+            <h2 class="tiers-title">36 Winners. <em>50,000 USDC</em> Distributed.</h2>
+          </div>
+          <p class="tiers-lead">
+            Instead of a single winner taking everything, the Season 04 pool is segmented into
+            three verifiable payout tiers so more participants win meaningful rewards.
+          </p>
+        </div>
+
+        <div class="tiers-grid">
+          <div class="tier-col tier-col--grand">
+            <div class="tier-top">
+              <span class="tier-tag">TIER 01 · GRAND PRIZE</span>
+              <span class="tier-mult">10,000× ENTRY</span>
+            </div>
+            <div class="tier-head-row">
+              <svg class="tier-glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2.5L19.5 12L12 21.5L4.5 12L12 2.5Z" stroke="#84CC16" stroke-width="1.35" />
+                <path d="M12 7L15.5 12L12 17L8.5 12L12 7Z" fill="#84CC16" />
+              </svg>
+              <div class="tier-amount">20,000 USDC</div>
+            </div>
+            <div class="tier-winners">1 Winner · 40% of Total Pool</div>
+            <div class="tier-bar" aria-hidden="true"><span style="width: 40%"></span></div>
+            <p class="tier-desc">
+              Awarded to the first ticket drawn by Chainlink VRF v2.5. Full headline payout sent
+              directly on-chain.
+            </p>
+          </div>
+
+          <div class="tier-col">
+            <div class="tier-top">
+              <span class="tier-tag">TIER 02 · RUNNER-UP</span>
+              <span class="tier-mult">1,500× ENTRY</span>
+            </div>
+            <div class="tier-head-row">
+              <svg class="tier-glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <polygon points="12,3 20,7.5 20,16.5 12,21 4,16.5 4,7.5" stroke="#F4F2ED" stroke-width="1.35" />
+                <circle cx="12" cy="12" r="2.5" fill="#F4F2ED" />
+              </svg>
+              <div class="tier-amount">3,000 USDC</div>
+            </div>
+            <div class="tier-winners">5 Winners · 15,000 USDC (30%)</div>
+            <div class="tier-bar" aria-hidden="true"><span style="width: 30%"></span></div>
+            <p class="tier-desc">
+              Five verified participants drawn immediately after the grand prize each receive 3,000 USDC.
+            </p>
+          </div>
+
+          <div class="tier-col">
+            <div class="tier-top">
+              <span class="tier-tag">TIER 03 · COMMUNITY</span>
+              <span class="tier-mult">250× ENTRY</span>
+            </div>
+            <div class="tier-head-row">
+              <svg class="tier-glyph" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5" stroke="#10B981" stroke-width="1.35" />
+                <circle cx="12" cy="12" r="3" fill="#10B981" />
+              </svg>
+              <div class="tier-amount">500 USDC</div>
+            </div>
+            <div class="tier-winners">30 Winners · 15,000 USDC (30%)</div>
+            <div class="tier-bar" aria-hidden="true"><span style="width: 30%"></span></div>
+            <p class="tier-desc">
+              Thirty additional entrants receive 500 USDC each, giving everyday supporters strong odds.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3-Step Fairness Strip -->
+    <section class="steps-section" aria-label="How Fairness Works">
+      <div class="container steps-grid">
+        <div class="step-item">
+          <span class="step-num">01</span>
+          <h2 class="step-title">Send $2 Entry Fee</h2>
+          <p class="step-body">
+            Choose ETH, BNB, USDT, TON, Solana, or Bitcoin and send <code>$2</code> within the 15-minute window.
+          </p>
+        </div>
+        <div class="step-item">
+          <span class="step-num">02</span>
+          <h2 class="step-title">Chainlink VRF v2.5</h2>
+          <p class="step-body">
+            Chainlink Automation locks the round and requests cryptographically verifiable randomness.
+          </p>
+        </div>
+        <div class="step-item">
+          <span class="step-num">03</span>
+          <h2 class="step-title">Automated Payout</h2>
+          <p class="step-body">
+            All 36 winning addresses are published and settled directly on-chain when the timer hits zero.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Subtle Sponsor Strip -->
+    <section class="sponsors-strip" aria-label="Ecosystem Partners">
+      <div class="container sponsors-inner">
+        <span class="sponsors-label">SUPPORTED BY</span>
+        <div class="sponsors-list">
+          <div class="sponsor-item">
+            <svg class="sponsor-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M12 2L21 12L12 22L3 12L12 2Z" fill="#84CC16" />
+              <path d="M12 7L17 12L12 17L7 12L12 7Z" fill="#08080A" />
+            </svg>
+            <span>KINETIC LABS</span>
+          </div>
+          <div class="sponsor-item">
+            <svg class="sponsor-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M3 5H10L14 19H7L3 5Z" fill="#D4AF37" />
+              <path d="M14 5H21L17 19H14L14 5Z" fill="#F4F2ED" />
+            </svg>
+            <span>VELD VENTURES</span>
+          </div>
+          <div class="sponsor-item">
+            <svg class="sponsor-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <rect x="3" y="3" width="8" height="8" fill="#10B981" />
+              <rect x="13" y="3" width="8" height="8" fill="#34D399" />
+              <rect x="3" y="13" width="8" height="8" fill="#34D399" />
+              <rect x="13" y="13" width="8" height="8" fill="#10B981" />
+            </svg>
+            <span>NODEGRID DIGITAL</span>
+          </div>
+          <div class="sponsor-item">
+            <svg class="sponsor-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="#F4F2ED" />
+              <rect x="10.5" y="3" width="3" height="18" fill="#08080A" />
+            </svg>
+            <span>MERIDIAN MEDIA</span>
+          </div>
+          <div class="sponsor-item">
+            <svg class="sponsor-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="#A1A1AA" />
+              <circle cx="15" cy="9" r="5" fill="#08080A" />
+            </svg>
+            <span>SOLSTICE COLLECTIVE</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span class="footer-brand">AURELIAS · DECENTRALIZED RAFFLE DEMO</span>
+      <span class="footer-note">Powered by Chainlink VRF v2.5</span>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
