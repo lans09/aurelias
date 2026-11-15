@@ -7,11 +7,20 @@ dns.setDefaultResultOrder('ipv4first');
 
 const DEFAULT_SITE_URL = 'https://www.evmsync.live/';
 const GENERATED_DIR = path.join(__dirname, '..', 'assets', 'social', 'generated');
+const POOL_DIR = path.join(__dirname, '..', 'assets', 'social', 'pool');
 const HISTORY_FILE = path.join(__dirname, '..', 'assets', 'social', '.post-history.json');
-const FALLBACK_IMAGES = [
-  'assets/social/aurelias-pool-50k.jpg',
-  'assets/social/aurelias-tiers-36.jpg',
-  'assets/social/aurelias-multichain-vrf.jpg',
+const ORGANIC_POOL_IMAGES = [
+  'assets/social/pool/organic-obsidian-basalt.jpg',
+  'assets/social/pool/organic-obsidian-hero.jpg',
+  'assets/social/pool/organic-obsidian-prism.jpg',
+  'assets/social/pool/organic-titanium-chronograph.jpg',
+  'assets/social/pool/organic-titanium-rings.jpg',
+];
+const PROMO_POOL_IMAGES = [
+  'assets/social/pool/promo-50k-pool.jpg',
+  'assets/social/pool/promo-36-tiers.jpg',
+  'assets/social/pool/promo-multichain-vrf.jpg',
+  'assets/social/pool/promo-20k-grand-prize.jpg',
 ];
 
 const BANNED_PATTERNS = [
@@ -418,6 +427,19 @@ function buildScheduleSlots(count) {
   return slots;
 }
 
+function pickUnusedPoolImage(isPromo, history) {
+  const candidates = isPromo ? PROMO_POOL_IMAGES : ORGANIC_POOL_IMAGES;
+  const recentSet = new Set(
+    (Array.isArray(history) ? history : [])
+      .slice(-(candidates.length - 1))
+      .map((h) => h.imagePath)
+      .filter(Boolean)
+  );
+  const unused = candidates.filter((img) => !recentSet.has(img));
+  const pool = unused.length > 0 ? unused : candidates;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
 async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt }) {
   const pillar = pickWeightedPillar();
   const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
@@ -436,26 +458,15 @@ async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview,
     post = buildFallbackPost(siteUrl, pillar, angle, timing);
   }
 
-  let imagePath = FALLBACK_IMAGES[Math.floor(Math.random() * FALLBACK_IMAGES.length)];
-  let imageSource = 'fallback-static';
+  let imagePath = pickUnusedPoolImage(pillar.isPromo, history);
+  let imageSource = 'curated-pool';
   if (!isPreview) {
     if (apiKey) {
       try {
         imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
         imageSource = 'gemini-2.5-flash-image';
       } catch (err) {
-        console.warn('Gemini image generation failed, trying Pollinations:', err.message);
-      }
-    } else {
-      console.warn('GEMINI_API_KEY is not set; using Pollinations for unique image generation.');
-    }
-
-    if (imageSource === 'fallback-static') {
-      try {
-        imagePath = await generateImageWithPollinations(post.imagePrompt);
-        imageSource = 'pollinations';
-      } catch (err) {
-        console.warn('Pollinations image generation failed, using static fallback:', err.message);
+        console.warn('Gemini image generation failed, using curated pool:', err.message);
       }
     }
   }
@@ -498,7 +509,7 @@ async function main() {
       dueAt: slots[i],
     });
     batch.push(item);
-    history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, text: item.text }].slice(-15);
+    history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, imagePath: item.imagePath, text: item.text }].slice(-15);
     if (!isPreview && i < count - 1) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
