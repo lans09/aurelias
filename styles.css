@@ -598,6 +598,11 @@ main {
   flex-shrink: 0;
 }
 
+.usdc-logo {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .tier-amount {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
