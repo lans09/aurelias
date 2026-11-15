@@ -1,54 +1,5 @@
 [
   {
-    "at": "2026-11-15T14:17:21.949Z",
-    "pillar": "psychology",
-    "angle": "Patience in Markets",
-    "text": "Most people still underestimate how much cross-border volume now settles in USDC instead of traditional bank rails. Speed and transparency compound quietly."
-  },
-  {
-    "at": "2026-11-15T14:17:22.143Z",
-    "pillar": "aurelias_promo",
-    "angle": "60-Second Multi-Chain Entry",
-    "text": "57h remaining in the current 72h Season 04 window. Enter AURELIAS Season 04 in under a minute using ETH, BNB, USDT, TON, Solana, or Bitcoin (15-min payment window). https://www.evmsync.live/"
-  },
-  {
-    "at": "2026-11-15T14:17:22.328Z",
-    "pillar": "fairness",
-    "angle": "Public Auditability",
-    "text": "Verifiable randomness matters because \"trust the backend\" is not a security model."
-  },
-  {
-    "at": "2026-11-15T14:17:22.519Z",
-    "pillar": "psychology",
-    "angle": "Asymmetric Risk",
-    "text": "Most people still underestimate how much cross-border volume now settles in USDC instead of traditional bank rails. Speed and transparency compound quietly."
-  },
-  {
-    "at": "2026-11-15T14:17:22.693Z",
-    "pillar": "onchain",
-    "angle": "Multi-Chain UX Friction",
-    "text": "Most people still underestimate how much cross-border volume now settles in USDC instead of traditional bank rails. Speed and transparency compound quietly."
-  },
-  {
-    "at": "2026-11-15T14:17:22.875Z",
-    "pillar": "aurelias_promo",
-    "angle": "36 Winners Architecture",
-    "text": "57h remaining in the current 72h Season 04 window. Enter AURELIAS Season 04 in under a minute using ETH, BNB, USDT, TON, Solana, or Bitcoin (15-min payment window). https://www.evmsync.live/"
-  },
-  {
-    "at": "2026-11-15T14:17:23.079Z",
-    "pillar": "psychology",
-    "angle": "Signal Over Noise",
-    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
-  },
-  {
-    "at": "2026-11-15T16:03:35.957Z",
-    "pillar": "onchain",
-    "angle": "Speed vs Finality",
-    "imagePath": "assets/social/pool/organic-titanium-chronograph.jpg",
-    "text": "Quiet execution and clean design always outlast loud hype."
-  },
-  {
     "at": "2026-11-15T16:06:59.070Z",
     "pillar": "onchain",
     "angle": "Speed vs Finality",
@@ -96,5 +47,61 @@
     "angle": "Multi-Chain UX Friction",
     "imagePath": "assets/social/pool/organic-titanium-rings.jpg",
     "text": "Verifiable randomness matters because \"trust the backend\" is not a security model."
+  },
+  {
+    "at": "2026-11-15T16:24:07.732Z",
+    "pillar": "psychology",
+    "angle": "Signal Over Noise",
+    "imagePath": "assets/social/pool/organic-obsidian-basalt.jpg",
+    "text": "Noise generates attention, but attention is not retention. The enduring products of every cycle are built by teams who spent the mania polishing edge cases instead of feeding the timeline."
+  },
+  {
+    "at": "2026-11-15T16:26:00.046Z",
+    "pillar": "aurelias_promo",
+    "angle": "36 Winners Architecture",
+    "imagePath": "assets/social/pool/promo-multichain-vrf.jpg",
+    "text": "Single-winner setups ignore proper distribution. Season 04 allocates 50,000 USDC across 36 winners: 1x 20k, 5x 3k, 30x 500 for a $2 entry. 55h remaining in the current 72h Season 04 window. https://www.evmsync.live/"
+  },
+  {
+    "at": "2026-11-15T16:26:02.157Z",
+    "pillar": "aurelias_promo",
+    "angle": "250x Community Tier Odds",
+    "imagePath": "assets/social/pool/promo-50k-pool.jpg",
+    "text": "55h remaining in the current 72h Season 04 window. 36 winners share 50,000 USDC in AURELIAS Season 04 for a $2 entry. https://www.evmsync.live/"
+  },
+  {
+    "at": "2026-11-15T16:26:04.277Z",
+    "pillar": "onchain",
+    "angle": "Multi-Chain UX Friction",
+    "imagePath": "assets/social/pool/organic-obsidian-prism.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:26:06.398Z",
+    "pillar": "aurelias_promo",
+    "angle": "250x Community Tier Odds",
+    "imagePath": "assets/social/pool/promo-36-tiers.jpg",
+    "text": "55h remaining in the current 72h Season 04 window. 36 winners share 50,000 USDC in AURELIAS Season 04 for a $2 entry. https://www.evmsync.live/"
+  },
+  {
+    "at": "2026-11-15T16:26:08.495Z",
+    "pillar": "fairness",
+    "angle": "Public Auditability",
+    "imagePath": "assets/social/pool/organic-titanium-rings.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-15T16:26:10.595Z",
+    "pillar": "aurelias_promo",
+    "angle": "60-Second Multi-Chain Entry",
+    "imagePath": "assets/social/pool/promo-50k-pool.jpg",
+    "text": "55h remaining in the current 72h Season 04 window. 30 community winners take 500 USDC each in Season 04, alongside the 20,000 USDC grand prize. https://www.evmsync.live/"
+  },
+  {
+    "at": "2026-11-15T16:26:12.698Z",
+    "pillar": "psychology",
+    "angle": "Asymmetric Risk",
+    "imagePath": "assets/social/pool/organic-obsidian-hero.jpg",
+    "text": "Quiet execution and clean design always outlast loud hype."
   }
 ]
