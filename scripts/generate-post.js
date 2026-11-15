@@ -1,6 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const dns = require('node:dns');
+
+dns.setDefaultResultOrder('ipv4first');
 
 const DEFAULT_SITE_URL = 'https://www.evmsync.live/';
 const GENERATED_DIR = path.join(__dirname, '..', 'assets', 'social', 'generated');
@@ -209,7 +212,7 @@ function buildFallbackPost(siteUrl, pillar, angle, timing) {
 
 async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing) {
   const endpoint =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent';
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
   const recentTexts = history.slice(-8).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
 
@@ -424,7 +427,7 @@ async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview,
   if (apiKey) {
     try {
       post = await generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing);
-      copySource = 'gemini-2.5-flash';
+      copySource = 'gemini-3.8-flash';
     } catch (err) {
       console.warn('Gemini copy generation failed, using fallback:', err.message);
       post = buildFallbackPost(siteUrl, pillar, angle, timing);
