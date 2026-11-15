@@ -13,6 +13,23 @@ const adminTotalVisitsEl = document.getElementById('admin-total-visits');
 const adminUniqueVisitorsEl = document.getElementById('admin-unique-visitors');
 const entriesListEl = document.getElementById('entries-list');
 const visitsListEl = document.getElementById('visits-list');
+const clearEntriesBtn = document.getElementById('clear-entries-btn');
+
+if (clearEntriesBtn) {
+  clearEntriesBtn.addEventListener('click', async () => {
+    if (!adminKey) return;
+    clearEntriesBtn.disabled = true;
+    try {
+      const res = await fetch('/api/entries', {
+        method: 'DELETE',
+        headers: { 'x-admin-key': adminKey },
+      });
+      if (res.ok) await refreshDashboard();
+    } finally {
+      clearEntriesBtn.disabled = false;
+    }
+  });
+}
 
 let adminKey = sessionStorage.getItem(ADMIN_KEY_STORAGE) || '';
 let pollTimer = null;
@@ -67,12 +84,17 @@ function renderEntries(data) {
           `
           : `<span class="mono-tag">${escapeHtml(entry.id)}</span>`;
 
+      const sentFlag =
+        entry.status === 'pending' && entry.userMarkedSentAt
+          ? ' <span class="badge-confirmed" style="margin-left:6px;">· USER SENT</span>'
+          : '';
+
       return `
         <div class="entry-row">
           <span class="mono-input" style="word-break:break-all;">${escapeHtml(entry.address)}</span>
           <span>${entry.telegram ? escapeHtml(entry.telegram) : '<span class="mono-tag">—</span>'}</span>
           <span class="mono-input">${escapeHtml(entry.asset)} · ${escapeHtml(entry.amountLabel)}</span>
-          <span class="${badgeClass}">${escapeHtml(entry.status.toUpperCase())}</span>
+          <span class="${badgeClass}">${escapeHtml(entry.status.toUpperCase())}${sentFlag}</span>
           <div class="row-actions">${actions}</div>
         </div>
       `;

@@ -119,6 +119,7 @@ const paymentTimerEl = document.getElementById('payment-timer');
 const qrContainer = document.getElementById('qr-container');
 
 const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
+const sentPaymentBtn = document.getElementById('sent-payment-btn');
 const newEntryBtn = document.getElementById('new-entry-btn');
 const copyAddressBtn = document.getElementById('copy-address-btn');
 
@@ -306,6 +307,10 @@ registerForm.addEventListener('submit', async (event) => {
     receivingAddrLabelEl.textContent = `Send $${ENTRY_FEE_USD} (${cfg.amountLabel}) To This ${cfg.name} Address`;
     receivingAddrEl.textContent = cfg.receivingAddress;
     waitingBannerEl.textContent = 'Waiting for incoming payment confirmation...';
+    if (sentPaymentBtn) {
+      sentPaymentBtn.disabled = false;
+      sentPaymentBtn.textContent = "I've Sent the Payment";
+    }
 
     renderQrCode(cfg.receivingAddress);
     startPaymentTimer();
@@ -316,6 +321,24 @@ registerForm.addEventListener('submit', async (event) => {
     formError.hidden = false;
   }
 });
+
+if (sentPaymentBtn) {
+  sentPaymentBtn.addEventListener('click', async () => {
+    if (!pendingEntryId) return;
+    sentPaymentBtn.disabled = true;
+    sentPaymentBtn.textContent = 'Payment Notified · Verifying...';
+    waitingBannerEl.textContent = 'Payment transfer notified. Verifying on-chain confirmation...';
+    try {
+      await fetch('/api/entries', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pendingEntryId, action: 'user_sent' }),
+      });
+    } catch {
+      // Polling continues either way
+    }
+  });
+}
 
 cancelPaymentBtn.addEventListener('click', () => {
   stopTimers();

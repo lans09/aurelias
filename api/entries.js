@@ -138,17 +138,8 @@ module.exports = async function handler(req, res) {
     }
 
     if (req.method === 'PATCH') {
-      const adminKey = req.headers['x-admin-key'];
-      const expectedKey = process.env.ADMIN_KEY || 'admin123';
-      if (adminKey !== expectedKey) {
-        res.statusCode = 401;
-        return res.end(JSON.stringify({ error: 'Unauthorized admin key' }));
-      }
-
       const body = await readJsonBody(req);
       const id = String(body.id || '').trim();
-      const status = body.status === 'confirmed' ? 'confirmed' : 'rejected';
-
       const entries = await readEntries();
       const idx = entries.findIndex((e) => e.id === id);
       if (idx === -1) {
@@ -156,11 +147,37 @@ module.exports = async function handler(req, res) {
         return res.end(JSON.stringify({ error: 'Entry not found' }));
       }
 
+      if (body.action === 'user_sent') {
+        entries[idx].userMarkedSentAt = Date.now();
+        await writeEntries(entries);
+        return res.end(JSON.stringify({ entry: entries[idx] }));
+      }
+
+      const adminKey = req.headers['x-admin-key'];
+      const expectedKey = process.env.ADMIN_KEY || 'admin123';
+      if (adminKey !== expectedKey) {
+        res.statusCode = 401;
+        return res.end(JSON.stringify({ error: 'Unauthorized admin key' }));
+      }
+
+      const status = body.status === 'confirmed' ? 'confirmed' : 'rejected';
       entries[idx].status = status;
       entries[idx].confirmedAt = status === 'confirmed' ? Date.now() : null;
       await writeEntries(entries);
 
       return res.end(JSON.stringify({ entry: entries[idx] }));
+    }
+
+    if (req.method === 'DELETE') {
+      const adminKey = req.headers['x-admin-key'];
+      const expectedKey = process.env.ADMIN_KEY || 'admin123';
+      if (adminKey !== expectedKey) {
+        res.statusCode = 401;
+        return res.end(JSON.stringify({ error: 'Unauthorized admin key' }));
+      }
+
+      await writeEntries([]);
+      return res.end(JSON.stringify({ ok: true, cleared: true }));
     }
 
     res.statusCode = 405;
