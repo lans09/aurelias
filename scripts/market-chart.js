@@ -6,17 +6,8 @@ const { Resvg } = require('@resvg/resvg-js');
 const GENERATED_DIR = path.join(__dirname, '..', 'assets', 'social', 'generated');
 
 const EXCLUDED_SYMBOLS = new Set([
-  'BTC', 'ETH', 'SOL', 'USDT', 'USDC', 'DAI', 'FDUSD', 'USDE', 'BUSD', 'TUSD', 'WBTC', 'WETH', 'STETH',
+  'BTC', 'WBTC', 'ETH', 'WETH', 'STETH', 'SOL', 'WSOL', 'USDT', 'USDC', 'DAI', 'FDUSD', 'USDE', 'USDG', 'BUSD', 'BNB', 'WBNB', 'PEPE', 'SHIB', 'DOGE', 'BONK', 'FLOKI',
 ]);
-
-const BACKUP_ALTCOINS = [
-  { id: 'bittensor', symbol: 'TAO', name: 'Bittensor' },
-  { id: 'sui', symbol: 'SUI', name: 'Sui' },
-  { id: 'hyperliquid', symbol: 'HYPE', name: 'Hyperliquid' },
-  { id: 'ondo-finance', symbol: 'ONDO', name: 'Ondo' },
-  { id: 'pendle', symbol: 'PENDLE', name: 'Pendle' },
-  { id: 'ethena', symbol: 'ENA', name: 'Ethena' },
-];
 
 function inferDecimals(price) {
   const n = Number(price);
@@ -29,11 +20,76 @@ function inferDecimals(price) {
 }
 
 function fmtPrice(val, decimals = null) {
-  const d = decimals === null ? inferDecimals(val) : decimals;
-  return `$${Number(val).toLocaleString('en-US', {
+  const n = Number(val || 0);
+  const d = decimals === null ? inferDecimals(n) : decimals;
+  return `$${n.toLocaleString('en-US', {
     minimumFractionDigits: d,
     maximumFractionDigits: d,
   })}`;
+}
+
+function fmtCompactUsd(val) {
+  const n = Number(val || 0);
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `$${(n / 1e3).toFixed(1)}K`;
+  return `$${n.toFixed(0)}`;
+}
+
+function shortAddr(addr = '') {
+  const s = String(addr);
+  if (s.length <= 12) return s;
+  return `${s.slice(0, 6)}...${s.slice(-4)}`;
+}
+
+function computePoolGrade(pool) {
+  const liq = Number(pool.liqUsd || 0);
+  const fdv = Math.max(Number(pool.fdvUsd || 0), liq);
+  const vol = Number(pool.vol24hUsd || 0);
+  const buys = Number(pool.buys24h || 0);
+  const sells = Number(pool.sells24h || 0);
+  const totalTx = buys + sells;
+  const buyPct = totalTx > 0 ? Math.round((buys / totalTx) * 100) : 50;
+  const depthPct = fdv > 0 ? (liq / fdv) * 100 : 0;
+
+  if (liq >= 350000 && depthPct >= 1.2 && buyPct >= 50) {
+    return {
+      grade: 'A',
+      color: '#84cc16',
+      bg: 'rgba(132,204,22,0.16)',
+      verdict: 'Deep liquidity & net spot absorption',
+      depthPct,
+      buyPct,
+    };
+  }
+  if (liq >= 150000 && depthPct >= 0.9) {
+    return {
+      grade: buyPct >= 52 ? 'B+' : 'B',
+      color: '#34d399',
+      bg: 'rgba(52,211,153,0.15)',
+      verdict: 'Healthy pool depth, active two-way flow',
+      depthPct,
+      buyPct,
+    };
+  }
+  if (liq >= 75000) {
+    return {
+      grade: 'C',
+      color: '#f59e0b',
+      bg: 'rgba(245,158,11,0.16)',
+      verdict: 'Moderate depth, size entries carefully',
+      depthPct,
+      buyPct,
+    };
+  }
+  return {
+    grade: 'D',
+    color: '#ef4444',
+    bg: 'rgba(239,68,68,0.16)',
+    verdict: 'Thin liquidity vs FDV, high slippage risk',
+    depthPct,
+    buyPct,
+  };
 }
 
 async function fetchJson(url, timeoutMs = 10000) {
@@ -49,49 +105,77 @@ async function fetchJson(url, timeoutMs = 10000) {
 }
 
 async function fetchLiveMarketSnapshot() {
-  const snapshot = { chartCoins: [], trending: [], headlines: [] };
+  const snapshot = { pools: [], chartCoins: [], trending: [], headlines: [] };
 
   try {
-    const t = await fetchJson('https://api.coingecko.com/api/v3/search/trending');
-    const coins = (t.coins || [])
-      .map((c) => ({
-        id: c.item?.id,
-        symbol: String(c.item?.symbol || '').toUpperCase(),
-        name: c.item?.name || '',
-        change24h: Number(c.item?.data?.price_change_percentage_24h?.usd || 0),
-      }))
-      .filter((c) => c.id && c.symbol && !EXCLUDED_SYMBOLS.has(c.symbol));
+    const d = await fetchJson('https://api.geckoterminal.com/api/v2/networks/trending_pools?page=1');
+    const rawPools = d.data || [];
 
-    snapshot.chartCoins = coins.slice(0, 5);
-    snapshot.trending = snapshot.chartCoins.map((c) => `${c.symbol} (${c.name})`);
+    for (const p of rawPools) {
+      const attr = p.attributes || {};
+      const rawName = String(attr.name || '');
+      const baseSymbol = rawName.split('/')[0].trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (!baseSymbol || EXCLUDED_SYMBOLS.has(baseSymbol)) continue;
+
+      const [network, poolAddress] = String(p.id || '').split('_');
+      if (!network || !poolAddress) continue;
+
+      const liqUsd = Number(attr.reserve_in_usd || 0);
+      const vol24hUsd = Number(attr.volume_usd?.h24 || 0);
+      if (liqUsd < 25000 || vol24hUsd < 80000) continue;
+
+      const buys24h = Number(attr.transactions?.h24?.buys || 0);
+      const sells24h = Number(attr.transactions?.h24?.sells || 0);
+      const poolObj = {
+        id: p.id,
+        network,
+        poolAddress,
+        symbol: baseSymbol,
+        pairName: rawName,
+        priceUsd: Number(attr.base_token_price_usd || 0),
+        change24h: Number(attr.price_change_percentage?.h24 || 0),
+        vol24hUsd,
+        liqUsd,
+        fdvUsd: Number(attr.fdv_usd || attr.market_cap_usd || liqUsd * 10),
+        buys24h,
+        sells24h,
+        whale: null,
+      };
+      poolObj.gradeInfo = computePoolGrade(poolObj);
+      snapshot.pools.push(poolObj);
+      if (snapshot.pools.length >= 6) break;
+    }
   } catch (err) {
-    console.warn('Trending coins fetch failed:', err.message);
+    console.warn('GeckoTerminal trending_pools fetch failed:', err.message);
   }
 
-  if (snapshot.chartCoins.length < 3) {
-    const existing = new Set(snapshot.chartCoins.map((c) => c.symbol));
-    for (const alt of BACKUP_ALTCOINS) {
-      if (!existing.has(alt.symbol)) {
-        snapshot.chartCoins.push({ ...alt, change24h: 0 });
+  // Enrich top 2 pools with live whale trade data
+  for (const pool of snapshot.pools.slice(0, 2)) {
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      const td = await fetchJson(
+        `https://api.geckoterminal.com/api/v2/networks/${pool.network}/pools/${pool.poolAddress}/trades`
+      );
+      const trades = (td.data || [])
+        .map((x) => x.attributes)
+        .filter((a) => a && Number(a.volume_in_usd) > 250)
+        .sort((a, b) => Number(b.volume_in_usd) - Number(a.volume_in_usd));
+
+      if (trades[0]) {
+        pool.whale = {
+          kind: String(trades[0].kind || 'buy').toUpperCase(),
+          usd: Number(trades[0].volume_in_usd),
+          wallet: trades[0].tx_from_address || '',
+          txHash: trades[0].tx_hash || '',
+        };
       }
-      if (snapshot.chartCoins.length >= 5) break;
+    } catch {
+      // Optional enrichment
     }
   }
 
-  try {
-    const ids = snapshot.chartCoins.map((c) => c.id).join(',');
-    const p = await fetchJson(
-      `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`
-    );
-    for (const coin of snapshot.chartCoins) {
-      if (p[coin.id]?.usd) {
-        coin.usd = Number(p[coin.id].usd);
-        coin.change24h = Number(p[coin.id].usd_24h_change ?? coin.change24h ?? 0);
-      }
-    }
-  } catch {
-    // OHLC still has latest close price
-  }
+  snapshot.chartCoins = snapshot.pools;
+  snapshot.trending = snapshot.pools.map((p) => `$${p.symbol} (${p.network})`);
 
   try {
     const controller = new AbortController();
@@ -104,7 +188,7 @@ async function fetchLiveMarketSnapshot() {
       const xml = await res.text();
       const matches = [...xml.matchAll(/<item>[\s\S]*?<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/g)];
       snapshot.headlines = matches
-        .slice(0, 4)
+        .slice(0, 3)
         .map((m) => m[1].replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim())
         .filter(Boolean);
     }
@@ -115,24 +199,29 @@ async function fetchLiveMarketSnapshot() {
   return snapshot;
 }
 
-async function fetchOhlcCandles(coin) {
-  const rows = await fetchJson(
-    `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin.id)}/ohlc?vs_currency=usd&days=7`
+async function fetchOhlcCandles(pool) {
+  const d = await fetchJson(
+    `https://api.geckoterminal.com/api/v2/networks/${pool.network}/pools/${pool.poolAddress}/ohlcv/hour?aggregate=1&limit=34`
   );
-  if (!Array.isArray(rows) || rows.length < 12) {
-    throw new Error(`Insufficient OHLC candles for ${coin.symbol}`);
+  const list = d?.data?.attributes?.ohlcv_list;
+  if (!Array.isArray(list) || list.length < 10) {
+    throw new Error(`Insufficient 1H OHLCV candles for ${pool.symbol}`);
   }
-  return rows.slice(-34).map(([ts, o, h, l, c]) => ({ ts, o, h, l, c }));
+  return list
+    .slice()
+    .reverse()
+    .map(([ts, o, h, l, c]) => ({ ts: ts * 1000, o: Number(o), h: Number(h), l: Number(l), c: Number(c) }));
 }
 
-function renderCandlestickChartPng(coin, candles) {
-  const symbol = coin.symbol;
-  const change24h = Number(coin.change24h || 0);
+function renderCandlestickChartPng(pool, candles) {
+  const symbol = pool.symbol;
+  const change24h = Number(pool.change24h || 0);
+  const gradeInfo = pool.gradeInfo || computePoolGrade(pool);
   const width = 1200;
   const height = 675;
   const padLeft = 48;
   const padRight = 148;
-  const padTop = 104;
+  const padTop = 132;
   const padBottom = 56;
   const plotW = width - padLeft - padRight;
   const plotH = height - padTop - padBottom;
@@ -143,7 +232,7 @@ function renderCandlestickChartPng(coin, candles) {
   const rawMin = Math.min(...lows);
   const span = Math.max(rawMax - rawMin, rawMax * 0.01);
   const maxP = rawMax + span * 0.1;
-  const minP = rawMin - span * 0.1;
+  const minP = Math.max(0, rawMin - span * 0.1);
 
   const recent12 = candles.slice(-12);
   const resistance = Math.max(...recent12.map((c) => c.h));
@@ -159,7 +248,7 @@ function renderCandlestickChartPng(coin, candles) {
     const y = yOf(p).toFixed(1);
     gridLines.push(
       `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`,
-      `<text x="${width - padRight + 14}" y="${Number(y) + 4}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="14">${fmtPrice(p, decimals)}</text>`
+      `<text x="${width - padRight + 14}" y="${Number(y) + 4}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="13">${fmtPrice(p, decimals)}</text>`
     );
   }
 
@@ -190,31 +279,41 @@ function renderCandlestickChartPng(coin, candles) {
   const chgColor = change24h >= 0 ? '#84cc16' : '#ef4444';
   const chgBg = change24h >= 0 ? 'rgba(132,204,22,0.14)' : 'rgba(239,68,68,0.14)';
 
+  const whaleStrip = pool.whale
+    ? `TOP WHALE CLIP: ${pool.whale.kind} ${fmtCompactUsd(pool.whale.usd)} (${shortAddr(pool.whale.wallet)})`
+    : `BUY RATIO: ${gradeInfo.buyPct}% (${pool.buys24h}B / ${pool.sells24h}S)`;
+
+  const metricsLine = `FDV ${fmtCompactUsd(pool.fdvUsd)}   ·   24H VOL ${fmtCompactUsd(pool.vol24hUsd)}   ·   LIQ ${fmtCompactUsd(pool.liqUsd)} (${gradeInfo.depthPct.toFixed(1)}%)   ·   ${whaleStrip}`;
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <rect width="${width}" height="${height}" fill="#0b0c10"/>
   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
 
-  <text x="${padLeft}" y="48" fill="#f4f4f5" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700">${symbol} / USD  ·  4H</text>
-  <text x="${padLeft}" y="78" fill="#ffffff" font-family="DejaVu Sans Mono, monospace" font-size="30" font-weight="700">${fmtPrice(lastPrice, decimals)}</text>
+  <text x="${padLeft}" y="44" fill="#f4f4f5" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700">$${symbol} / ${String(pool.network).toUpperCase()}  ·  1H DEX AUDIT</text>
+  <text x="${padLeft}" y="76" fill="#ffffff" font-family="DejaVu Sans Mono, monospace" font-size="28" font-weight="700">${fmtPrice(lastPrice, decimals)}</text>
 
-  <rect x="295" y="52" width="112" height="30" rx="6" fill="${chgBg}"/>
-  <text x="351" y="72" text-anchor="middle" fill="${chgColor}" font-family="DejaVu Sans Mono, monospace" font-size="16" font-weight="700">${chgSign}${change24h.toFixed(2)}%</text>
+  <rect x="280" y="52" width="112" height="28" rx="6" fill="${chgBg}"/>
+  <text x="336" y="71" text-anchor="middle" fill="${chgColor}" font-family="DejaVu Sans Mono, monospace" font-size="15" font-weight="700">${chgSign}${change24h.toFixed(1)}%</text>
 
-  <text x="${width - padRight}" y="48" text-anchor="end" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="14">AURELIAS DESK  ·  TRENDING 4H</text>
+  <rect x="${width - padRight - 160}" y="24" width="160" height="32" rx="6" fill="${gradeInfo.bg}" stroke="${gradeInfo.color}" stroke-width="1"/>
+  <text x="${width - padRight - 80}" y="45" text-anchor="middle" fill="${gradeInfo.color}" font-family="DejaVu Sans Mono, monospace" font-size="15" font-weight="700">DESK GRADE: ${gradeInfo.grade}</text>
+
+  <rect x="${padLeft}" y="88" width="${width - padLeft - padRight}" height="28" rx="4" fill="rgba(255,255,255,0.04)"/>
+  <text x="${padLeft + 12}" y="107" fill="#d4d4d8" font-family="DejaVu Sans Mono, monospace" font-size="13">${metricsLine}</text>
 
   ${gridLines.join('\n  ')}
 
   <line x1="${padLeft}" y1="${resY}" x2="${width - padRight}" y2="${resY}" stroke="#ef4444" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <text x="${padLeft + 8}" y="${Number(resY) - 8}" fill="#ef4444" font-family="DejaVu Sans Mono, monospace" font-size="13">48H HIGH  ${fmtPrice(resistance, decimals)}</text>
+  <text x="${padLeft + 8}" y="${Number(resY) - 8}" fill="#ef4444" font-family="DejaVu Sans Mono, monospace" font-size="13">12H HIGH  ${fmtPrice(resistance, decimals)}</text>
 
   <line x1="${padLeft}" y1="${supY}" x2="${width - padRight}" y2="${supY}" stroke="#84cc16" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <text x="${padLeft + 8}" y="${Number(supY) + 18}" fill="#84cc16" font-family="DejaVu Sans Mono, monospace" font-size="13">48H LOW   ${fmtPrice(support, decimals)}</text>
+  <text x="${padLeft + 8}" y="${Number(supY) + 18}" fill="#84cc16" font-family="DejaVu Sans Mono, monospace" font-size="13">12H LOW   ${fmtPrice(support, decimals)}</text>
 
   ${candleSvg}
 
   <line x1="${padLeft}" y1="${curY}" x2="${width - padRight}" y2="${curY}" stroke="#a1a1aa" stroke-opacity="0.4" stroke-width="1" stroke-dasharray="3 3"/>
-  <rect x="${width - padRight + 8}" y="${Number(curY) - 13}" width="126" height="26" rx="4" fill="#f4f4f5"/>
-  <text x="${width - padRight + 71}" y="${Number(curY) + 5}" text-anchor="middle" fill="#0b0c10" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="700">${fmtPrice(lastPrice, decimals)}</text>
+  <rect x="${width - padRight + 8}" y="${Number(curY) - 13}" width="128" height="26" rx="4" fill="#f4f4f5"/>
+  <text x="${width - padRight + 72}" y="${Number(curY) + 5}" text-anchor="middle" fill="#0b0c10" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="700">${fmtPrice(lastPrice, decimals)}</text>
 </svg>`;
 
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: width } });
@@ -229,18 +328,87 @@ function renderCandlestickChartPng(coin, candles) {
   return {
     imagePath: `assets/social/generated/${filename}`,
     symbol,
-    name: coin.name,
+    network: pool.network,
     price: lastPrice,
     decimals,
     support,
     resistance,
     change24h,
+    vol24hUsd: pool.vol24hUsd,
+    liqUsd: pool.liqUsd,
+    fdvUsd: pool.fdvUsd,
+    buys24h: pool.buys24h,
+    sells24h: pool.sells24h,
+    whale: pool.whale,
+    gradeInfo,
   };
+}
+
+function renderDeskScorecardPng(pools) {
+  const top4 = pools.slice(0, 4);
+  const width = 1200;
+  const height = 675;
+
+  const rowsSvg = top4
+    .map((p, idx) => {
+      const y = 180 + idx * 112;
+      const g = p.gradeInfo || computePoolGrade(p);
+      const chgSign = p.change24h >= 0 ? '+' : '';
+      const chgColor = p.change24h >= 0 ? '#84cc16' : '#ef4444';
+
+      return `<g>
+        <rect x="48" y="${y}" width="1104" height="94" rx="8" fill="#12131a" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+        <text x="76" y="${y + 42}" fill="#ffffff" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700">$${p.symbol}</text>
+        <text x="76" y="${y + 68}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="13">${String(p.network).toUpperCase()}  ·  ${fmtPrice(p.priceUsd)}</text>
+
+        <text x="275" y="${y + 42}" fill="${chgColor}" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700">${chgSign}${p.change24h.toFixed(1)}%</text>
+        <text x="275" y="${y + 68}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="12">24H CHANGE</text>
+
+        <text x="455" y="${y + 42}" fill="#f4f4f5" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700">${fmtCompactUsd(p.vol24hUsd)}</text>
+        <text x="455" y="${y + 68}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="12">24H VOLUME</text>
+
+        <text x="645" y="${y + 42}" fill="#f4f4f5" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700">${fmtCompactUsd(p.liqUsd)}</text>
+        <text x="645" y="${y + 68}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="12">LIQUIDITY (${g.depthPct.toFixed(1)}%)</text>
+
+        <text x="845" y="${y + 42}" fill="#f4f4f5" font-family="DejaVu Sans Mono, monospace" font-size="20" font-weight="700">${fmtCompactUsd(p.fdvUsd)}</text>
+        <text x="845" y="${y + 68}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="12">FDV  ·  ${g.buyPct}% BUYS</text>
+
+        <rect x="1015" y="${y + 22}" width="110" height="50" rx="8" fill="${g.bg}" stroke="${g.color}" stroke-width="1.5"/>
+        <text x="1070" y="${y + 54}" text-anchor="middle" fill="${g.color}" font-family="DejaVu Sans Mono, monospace" font-size="24" font-weight="700">${g.grade}</text>
+      </g>`;
+    })
+    .join('\n  ');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#08090c"/>
+  <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+  <text x="48" y="54" fill="#84cc16" font-family="DejaVu Sans Mono, monospace" font-size="14" font-weight="700">AURELIAS ON-CHAIN DESK  ·  LIQUIDITY &amp; FLOW AUDIT</text>
+  <text x="48" y="96" fill="#ffffff" font-family="DejaVu Sans, sans-serif" font-size="34" font-weight="700">Top Trending DEX Runners Scorecard</text>
+  <text x="48" y="130" fill="#a1a1aa" font-family="DejaVu Sans Mono, monospace" font-size="14">Graded live on Liquidity-to-FDV Depth, 24h Volume Velocity, and Net Buy Orderflow</text>
+
+  ${rowsSvg}
+</svg>`;
+
+  const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: width } });
+  const pngBuffer = resvg.render().asPng();
+
+  const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
+  const rand = crypto.randomBytes(3).toString('hex');
+  const filename = `scorecard-${stamp}-${rand}.png`;
+  fs.mkdirSync(GENERATED_DIR, { recursive: true });
+  fs.writeFileSync(path.join(GENERATED_DIR, filename), pngBuffer);
+
+  return `assets/social/generated/${filename}`;
 }
 
 module.exports = {
   fmtPrice,
+  fmtCompactUsd,
+  shortAddr,
+  computePoolGrade,
   fetchLiveMarketSnapshot,
   fetchOhlcCandles,
   renderCandlestickChartPng,
+  renderDeskScorecardPng,
 };

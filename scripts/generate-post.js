@@ -1,20 +1,22 @@
 const fs = require('node:fs');
 const path = require('node:path');
-const crypto = require('node:crypto');
 const dns = require('node:dns');
 const {
+  fmtPrice,
+  fmtCompactUsd,
+  shortAddr,
   fetchLiveMarketSnapshot,
   fetchOhlcCandles,
   renderCandlestickChartPng,
-  fmtPrice,
+  renderDeskScorecardPng,
 } = require('./market-chart');
 
 dns.setDefaultResultOrder('ipv4first');
 
 const DEFAULT_SITE_URL = 'https://www.evmsync.live/?ref=x';
 const GENERATED_DIR = path.join(__dirname, '..', 'assets', 'social', 'generated');
-const POOL_DIR = path.join(__dirname, '..', 'assets', 'social', 'pool');
 const HISTORY_FILE = path.join(__dirname, '..', 'assets', 'social', '.post-history.json');
+
 const ORGANIC_POOL_IMAGES = [
   'assets/social/pool/organic-obsidian-basalt.jpg',
   'assets/social/pool/organic-obsidian-hero.jpg',
@@ -22,6 +24,7 @@ const ORGANIC_POOL_IMAGES = [
   'assets/social/pool/organic-titanium-chronograph.jpg',
   'assets/social/pool/organic-titanium-rings.jpg',
 ];
+
 const PROMO_POOL_IMAGES = [
   'assets/social/pool/promo-50k-pool.jpg',
   'assets/social/pool/promo-36-tiers.jpg',
@@ -34,92 +37,6 @@ const BANNED_PATTERNS = [
   /#[a-z0-9_]+/i,
   /\b(lfg|wagmi|ngmi|gm frens|to the moon|100x gem|delve|tapestry|game[- ]changer|revolutionize|elevate|unleash|in a world where|here'?s why|let'?s dive|buckle up|don'?t miss out|act fast)\b/i,
   /[\u{1F680}\u{1F525}\u{1F48E}\u{2728}]/u,
-];
-
-const PILLARS = [
-  {
-    id: 'orderflow',
-    weight: 25,
-    isPromo: false,
-    angles: [
-      {
-        name: 'Liquidity Sweeps & Funding',
-        brief: 'Sharp trading-desk observation on how high open interest and crowded perp funding usually lead to a liquidity sweep before the real trend starts.',
-        visualSeed: 'Minimalist macro studio photograph of translucent smoked glass blocks stacked on matte black basalt stone with a single razor-thin lime (#84cc16) light edge. No text.',
-      },
-      {
-        name: 'Spot vs Perp Divergence',
-        brief: 'Note how spot-led rallies behave completely differently from leverage-driven pumps, and why serious desks track spot CVD first.',
-        visualSeed: 'Clean architectural 3D render of six dark brushed-titanium rails converging smoothly into a single illuminated obsidian hub on a velvet black background. No text.',
-      },
-      {
-        name: 'Session Liquidity',
-        brief: 'Short, grounded trading remark on how London and New York market opens shape crypto volatility and fakeouts.',
-        visualSeed: 'High-contrast dark editorial still life of a precision mechanical chronograph resting on matte obsidian slate under moody directional studio light. No text.',
-      },
-    ],
-  },
-  {
-    id: 'risk',
-    weight: 25,
-    isPromo: false,
-    angles: [
-      {
-        name: 'Invalidation Over Conviction',
-        brief: 'Trading desk principle: knowing where your trade is wrong before entering matters more than how bullish your thesis sounds.',
-        visualSeed: 'Precision dark titanium cryptographic gyroscope suspended inside smoked obsidian glass with subtle emerald-lime rim light, luxury Swiss watchmaking photography. No text.',
-      },
-      {
-        name: 'Surviving Chop',
-        brief: 'Crisp take on why most traders lose money in sideways ranges, not crashes: over-sizing when there is zero directional edge.',
-        visualSeed: 'Minimalist dark geometric sculpture of interlocking matte carbon and brushed steel rings catching crisp studio highlights on deep black. No text.',
-      },
-      {
-        name: 'Asymmetric R:R Math',
-        brief: 'Explain why capping downside cleanly and letting asymmetric setups work is the only math that compounds over 100+ trades.',
-        visualSeed: 'Moody luxury editorial photography of a single sleek dark obsidian prism casting a sharp electric-lime light refraction across matte black stone. No text.',
-      },
-    ],
-  },
-  {
-    id: 'debates',
-    weight: 25,
-    isPromo: false,
-    angles: [
-      {
-        name: 'Execution Rail Debate',
-        brief: 'Ask a sharp, engaging question to traders about which chain currently has the best execution and settlement UX: Solana, Base, ETH, or TON.',
-        visualSeed: 'Ultra-minimalist dark architectural interior bathed in deep shadows with one thin vertical slit of crisp warm-lime light on concrete. No text.',
-      },
-      {
-        name: 'Wallet Hygiene & Security',
-        brief: 'Practical trading-desk warning: never blind-sign Permit2 or unlimited token approvals; keep hot execution wallets separate from cold storage.',
-        visualSeed: 'Dark luxury studio still life of matte black ceramic spheres balanced on a brushed titanium beam, calm moody lighting. No text.',
-      },
-    ],
-  },
-  {
-    id: 'aurelias_promo',
-    weight: 25,
-    isPromo: true,
-    angles: [
-      {
-        name: '36 Winners Architecture',
-        brief: 'Highlight AURELIAS Season 04: 50,000 USDC split across 36 winners (1x 20,000 USDC, 5x 3,000 USDC, 30x 500 USDC) for a $2 entry.',
-        visualSeed: 'Dark obsidian (#08080a) editorial card with brushed titanium rows showing "36 WINNERS • $2 ENTRY" and "50,000 USDC" with hairline #84cc16 lime accents.',
-      },
-      {
-        name: 'Zero Wallet Connect Entry',
-        brief: 'Focus on how AURELIAS Season 04 works: no wallet popups, enter with ETH, BNB, USDT, TON, Solana, or BTC inside a 15-minute window.',
-        visualSeed: 'Luxury macro studio render of a dark titanium chronometer surrounded by matte metallic chain marks on deep obsidian, crisp minimal text "ENTER IN 60 SECONDS".',
-      },
-      {
-        name: '250x Community Tier Odds',
-        brief: 'Spotlight that 30 community winners each take 500 USDC on a $2 entry, alongside the 20,000 USDC grand prize.',
-        visualSeed: 'High-contrast dark studio graphic featuring a brushed-titanium vault orb with #84cc16 rim light and sharp editorial typography "50,000 USDC | 36 WINNERS".',
-      },
-    ],
-  },
 ];
 
 function getTimingContext() {
@@ -148,16 +65,6 @@ function getTimingContext() {
   return { hoursLeft, label };
 }
 
-function pickWeightedPillar() {
-  const total = PILLARS.reduce((sum, p) => sum + p.weight, 0);
-  let r = Math.random() * total;
-  for (const pillar of PILLARS) {
-    r -= pillar.weight;
-    if (r <= 0) return pillar;
-  }
-  return PILLARS[0];
-}
-
 function loadHistory() {
   try {
     if (!fs.existsSync(HISTORY_FILE)) return [];
@@ -166,12 +73,6 @@ function loadHistory() {
   } catch {
     return [];
   }
-}
-
-function saveHistory(history, entry) {
-  const updated = [...history, entry].slice(-15);
-  fs.mkdirSync(path.dirname(HISTORY_FILE), { recursive: true });
-  fs.writeFileSync(HISTORY_FILE, JSON.stringify(updated, null, 2));
 }
 
 function hasBannedPattern(text) {
@@ -203,81 +104,121 @@ function sanitizeTweet(raw, siteUrl, includeUrl) {
   return text;
 }
 
-function buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo) {
-  if (!pillar.isPromo) {
-    if (chartInfo) {
-      const sym = chartInfo.symbol;
-      const decimals = chartInfo.decimals;
-      const p = fmtPrice(chartInfo.price, decimals);
-      const sup = fmtPrice(chartInfo.support, decimals);
-      const res = fmtPrice(chartInfo.resistance, decimals);
-      const chg = `${chartInfo.change24h >= 0 ? '+' : ''}${chartInfo.change24h.toFixed(1)}%`;
-      const chartLines = [
-        `$${sym} 4H at ${p} (${chg} 24h). Key range is ${sup} support to ${res} resistance. Are you bidding the sweep or waiting for a breakout?`,
-        `$${sym} sitting at ${p} right now. Either ${sup} holds on the 4H or we test lower liquidity before any bounce. Long or flat here?`,
-      ];
-      return {
-        text: chartLines[Math.floor(Math.random() * chartLines.length)],
-        angle: angle.name,
-        imagePrompt: angle.visualSeed,
-      };
-    }
-
-    const topAlts = market?.chartCoins || [];
-    const altA = topAlts[0]?.symbol || 'TAO';
-    const altB = topAlts[1]?.symbol || 'SUI';
-    const organicPool = [
-      `$${altA} vs $${altB}. If you can only hold one trending mid-cap for the next 30 days, which one outperforms?`,
-      `Watching $${altA} flow today. Most traders wait for confirmation at the exact level they end up chasing.`,
-      `Be honest: moving your stop to breakeven too early or having no stop at all, which one has cost you more money this year?`,
-    ];
-    const text = organicPool[Math.floor(Math.random() * organicPool.length)];
-    return { text, angle: angle.name, imagePrompt: angle.visualSeed };
-  }
-
-  const promoPool = [
-    `${timing.label}. 36 winners share 50,000 USDC in AURELIAS Season 04 for a $2 entry. ${siteUrl}`,
-    `${timing.label}. Enter AURELIAS Season 04 in under a minute using ETH, BNB, USDT, TON, Solana, or Bitcoin (15-min payment window). ${siteUrl}`,
-    `${timing.label}. 30 community winners take 500 USDC each in Season 04, alongside the 20,000 USDC grand prize. ${siteUrl}`,
-  ];
-  const text = sanitizeTweet(promoPool[Math.floor(Math.random() * promoPool.length)], siteUrl, true);
-  return { text, angle: angle.name, imagePrompt: angle.visualSeed };
+function pickUnusedPoolImage(isPromo, history) {
+  const candidates = isPromo ? PROMO_POOL_IMAGES : ORGANIC_POOL_IMAGES;
+  const recentSet = new Set(
+    (Array.isArray(history) ? history : [])
+      .slice(-(candidates.length - 1))
+      .map((h) => h.imagePath)
+      .filter(Boolean)
+  );
+  const unused = candidates.filter((img) => !recentSet.has(img));
+  const pool = unused.length > 0 ? unused : candidates;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
-async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing, market, chartInfo) {
+function buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo }) {
+  if (mode === 'aurelias_promo') {
+    const promoPool = [
+      `${timing.label}. AURELIAS Season 04 allocates 50,000 USDC across 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC) for a $2 entry. Zero wallet connect. ${siteUrl}`,
+      `${timing.label}. Most traders burn $15 a day in DEX slippage. Season 04 is a capped $2 entry for 36 shots at 50,000 USDC. ${siteUrl}`,
+    ];
+    return sanitizeTweet(promoPool[Math.floor(Math.random() * promoPool.length)], siteUrl, true);
+  }
+
+  if (mode === 'desk_scorecard' && pools?.length >= 3) {
+    const lines = pools.slice(0, 4).map((p) => {
+      const g = p.gradeInfo?.grade || 'B';
+      return `$${p.symbol} (${fmtCompactUsd(p.vol24hUsd)} vol / ${fmtCompactUsd(p.liqUsd)} liq): Grade ${g}`;
+    });
+    return sanitizeTweet(
+      `On-chain desk scorecard: ${lines.join(' | ')}. Reply with a ticker + CA to queue it for the next liquidity audit.`,
+      siteUrl,
+      false
+    );
+  }
+
+  const target = chartInfo || pool;
+  if (target) {
+    const sym = target.symbol;
+    const g = target.gradeInfo || { grade: 'B', depthPct: 1.5, buyPct: 52, verdict: 'Active flow' };
+    const vol = fmtCompactUsd(target.vol24hUsd);
+    const liq = fmtCompactUsd(target.liqUsd);
+    const fdv = fmtCompactUsd(target.fdvUsd);
+
+    if (mode === 'whale_flow' && target.whale) {
+      const w = target.whale;
+      return sanitizeTweet(
+        `On-chain flow alert on $${sym}: wallet ${shortAddr(w.wallet)} executed a ${fmtCompactUsd(w.usd)} ${w.kind} as 24h volume reached ${vol} against ${liq} liquidity (${fdv} FDV). Desk Grade: ${g.grade} (${g.verdict}).`,
+        siteUrl,
+        false
+      );
+    }
+
+    return sanitizeTweet(
+      `Liquidity audit on $${sym}: ${vol} 24h volume on ${liq} liquidity (${g.depthPct.toFixed(1)}% of ${fdv} FDV, ${g.buyPct}% buys). Desk Grade: ${g.grade}. ${g.verdict}.`,
+      siteUrl,
+      false
+    );
+  }
+
+  return 'AURELIAS Desk: Always verify pool liquidity depth relative to FDV before sizing into trending on-chain runners.';
+}
+
+async function generateCopyWithGemini({ apiKey, mode, siteUrl, history, timing, pool, pools, chartInfo }) {
   const endpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
-  const recentTexts = history.slice(-8).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
-  const marketLines = [];
-  if (chartInfo) {
-    const dec = chartInfo.decimals;
-    marketLines.push(`Attached live 4H chart: $${chartInfo.symbol} (${chartInfo.name || chartInfo.symbol}) at ${fmtPrice(chartInfo.price, dec)}, 24h ${chartInfo.change24h.toFixed(1)}%, 48h Low ${fmtPrice(chartInfo.support, dec)}, 48h High ${fmtPrice(chartInfo.resistance, dec)}`);
+  const recentTexts = history.slice(-6).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
+  const target = chartInfo || pool;
+
+  let modeBrief = '';
+  if (mode === 'whale_flow' && target) {
+    const g = target.gradeInfo || {};
+    const whaleStr = target.whale
+      ? `Top whale swap: wallet ${shortAddr(target.whale.wallet)} ${target.whale.kind} ${fmtCompactUsd(target.whale.usd)}`
+      : `Buy ratio: ${g.buyPct}% (${target.buys24h} buys vs ${target.sells24h} sells)`;
+    modeBrief = [
+      'Format: Institutional Whale Flow Alert (@lookonchain / @spotonchain style).',
+      `Token: $${target.symbol} (${target.network})`,
+      `Price: ${fmtPrice(target.price || target.priceUsd)} (${Number(target.change24h || 0).toFixed(1)}% 24h)`,
+      `Metrics: 24h Vol ${fmtCompactUsd(target.vol24hUsd)}, Liquidity ${fmtCompactUsd(target.liqUsd)} (${(g.depthPct || 0).toFixed(1)}% of ${fmtCompactUsd(target.fdvUsd)} FDV)`,
+      whaleStr,
+      `Desk Grade: ${g.grade} (${g.verdict}). State a definitive desk read with these exact numbers. Do NOT ask a question.`,
+    ].join('\n');
+  } else if (mode === 'liquidity_audit' && target) {
+    const g = target.gradeInfo || {};
+    modeBrief = [
+      'Format: Institutional Liquidity & Slippage Audit (@bubblemaps style).',
+      `Token: $${target.symbol} (${target.network})`,
+      `Metrics: ${fmtCompactUsd(target.vol24hUsd)} 24h volume vs ${fmtCompactUsd(target.liqUsd)} liquidity (${(g.depthPct || 0).toFixed(1)}% depth against ${fmtCompactUsd(target.fdvUsd)} FDV, ${g.buyPct}% buys).`,
+      chartInfo ? `12H Range: ${fmtPrice(chartInfo.support, chartInfo.decimals)} low to ${fmtPrice(chartInfo.resistance, chartInfo.decimals)} high.` : '',
+      `Desk Grade: ${g.grade} (${g.verdict}). Publish a hard, number-backed liquidity verdict. Do NOT ask a wishy-washy question.`,
+    ].filter(Boolean).join('\n');
+  } else if (mode === 'desk_scorecard' && pools?.length) {
+    const rows = pools.slice(0, 4).map(
+      (p) => `$${p.symbol}: ${fmtCompactUsd(p.vol24hUsd)} vol / ${fmtCompactUsd(p.liqUsd)} liq (${p.gradeInfo?.depthPct.toFixed(1)}% depth) -> Grade ${p.gradeInfo?.grade}`
+    );
+    modeBrief = [
+      'Format: 4-Coin On-Chain Desk Scorecard.',
+      `Coins:\n${rows.join('\n')}`,
+      'List all 4 $TICKERs with their key volume/liquidity stat and Grade (A to D), and end with: "Reply with a ticker + CA for the next desk audit."',
+    ].join('\n');
+  } else {
+    modeBrief = `Format: AURELIAS Season 04 Promo. Facts: 50,000 USDC pool across 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC), $2 entry, zero wallet connect, 15-min payment window. Timing: "${timing.label}". MUST include exact URL: ${siteUrl}`;
   }
-  if (market?.trending?.length) marketLines.push(`Trending altcoins today: ${market.trending.join(', ')}`);
-  if (market?.headlines?.length) marketLines.push(`Headlines today: ${market.headlines.slice(0, 3).join(' | ')}`);
 
   const rules = [
-    'You run the X (Twitter) account for AURELIAS, an active crypto trading desk.',
-    'Write short, raw, conversational Crypto X posts that make real traders stop and REPLY.',
-    'NEVER write generic textbook trading quotes ("chop wipes out traders", "patience is an edge", etc.). Reference real today prices, chart levels, or headlines.',
-    'Hard bans (violating ANY of these is an instant fail):',
+    'You are the lead analyst for AURELIAS, an institutional crypto trading and on-chain flow desk.',
+    'Strict rules:',
+    '- Under 255 characters total.',
     '- NO em-dashes or en-dashes.',
-    '- NO hashtags (#).',
-    '- NO generic AI filler words: delve, tapestry, landscape, unlock, elevate, unleash, game-changer, revolutionize, buckle up, here is why, in a world where.',
-    '- NO crypto bro slang or emojis: LFG, WAGMI, GM frens, to the moon, gem, rocket/fire/sparkle emojis.',
-    '- Under 245 characters total.',
-    pillar.isPromo
-      ? `This is a PROMO post for AURELIAS Season 04. Facts: 50,000 USDC pool, 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC), $2 entry, ETH/BNB/USDT/TON/Solana/BTC, Chainlink VRF v2.5, 15-minute payment window. Timing urgency to include naturally: "${timing.label}". MUST include exact URL: ${siteUrl}`
-      : 'This is an ORGANIC trader engagement post. Do NOT mention AURELIAS, giveaways, raffles, or include any URL. End with a direct question or polarizing take so traders reply.',
-    marketLines.length ? `LIVE MARKET DATA RIGHT NOW:\n${marketLines.join('\n')}` : '',
-    recentTexts ? `Recent posts (DO NOT repeat these openers, phrasing, or angles):\n${recentTexts}` : '',
-    'Task: Draft 3 distinct candidates, score each 1-10 on how likely a real trader is to reply, and output ONLY the highest-scoring candidate in JSON: { "bestTweet": "...", "score": 9, "imagePrompt": "..." }.',
-  ]
-    .filter(Boolean)
-    .join('\n');
-
-  const userPrompt = `Pillar: ${pillar.id}\nAngle: ${angle.name}\nBrief: ${angle.brief}\nVisual seed: ${angle.visualSeed}`;
+    '- NO hashtags (#) and NO emojis.',
+    '- Always prefix token symbols with $ (e.g. $CASHCAT, $MIHAO).',
+    '- Sound authoritative, sharp, and data-dense. Never use generic AI filler.',
+    recentTexts ? `Recent posts (do not repeat):\n${recentTexts}` : '',
+    'Return JSON: { "bestTweet": "..." }.',
+  ].filter(Boolean).join('\n');
 
   const res = await fetch(endpoint, {
     method: 'POST',
@@ -287,18 +228,14 @@ async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, t
     },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: rules }] },
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+      contents: [{ role: 'user', parts: [{ text: modeBrief }] }],
       generationConfig: {
-        temperature: 0.9,
+        temperature: 0.7,
         responseMimeType: 'application/json',
         responseSchema: {
           type: 'OBJECT',
-          properties: {
-            bestTweet: { type: 'STRING' },
-            score: { type: 'NUMBER' },
-            imagePrompt: { type: 'STRING' },
-          },
-          required: ['bestTweet', 'score', 'imagePrompt'],
+          properties: { bestTweet: { type: 'STRING' } },
+          required: ['bestTweet'],
         },
       },
     }),
@@ -314,99 +251,11 @@ async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, t
   if (!rawJson) throw new Error('Gemini copy API returned empty response.');
 
   const parsed = JSON.parse(rawJson);
-  const cleaned = sanitizeTweet(parsed.bestTweet, siteUrl, pillar.isPromo);
-
+  const cleaned = sanitizeTweet(parsed.bestTweet, siteUrl, mode === 'aurelias_promo');
   if (hasBannedPattern(cleaned)) {
     throw new Error(`Generated tweet triggered anti-slop filter: "${cleaned}"`);
   }
-
-  return {
-    text: cleaned,
-    angle: angle.name,
-    score: parsed.score,
-    imagePrompt: parsed.imagePrompt || angle.visualSeed,
-  };
-}
-
-async function generateImageWithGemini(apiKey, imagePrompt) {
-  const endpoint =
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent';
-
-  const fullPrompt = [
-    'Create a 16:9 ultra-luxury dark editorial visual.',
-    'Aesthetic: Deep matte obsidian (#08080a), brushed dark titanium, smoked glass, subtle electric lime (#84cc16) rim lighting, Porsche Design / Swiss watchmaking precision.',
-    'Rules: High contrast, clean composition, NO cartoons, NO rockets, NO falling coins, NO em-dashes, NO cluttered text.',
-    `Scene: ${imagePrompt}`,
-  ].join(' ');
-
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-      generationConfig: {
-        responseModalities: ['TEXT', 'IMAGE'],
-        imageConfig: { aspectRatio: '16:9' },
-      },
-    }),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini image API error (${res.status}): ${errText}`);
-  }
-
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
-  const imgPart = parts.find((p) => p.inlineData?.data);
-  if (!imgPart) throw new Error('Gemini image API did not return inline image data.');
-
-  const mimeType = imgPart.inlineData.mimeType || 'image/png';
-  const ext = mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'png';
-  const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-  const rand = crypto.randomBytes(3).toString('hex');
-  const filename = `post-${stamp}-${rand}.${ext}`;
-
-  fs.mkdirSync(GENERATED_DIR, { recursive: true });
-  fs.writeFileSync(path.join(GENERATED_DIR, filename), Buffer.from(imgPart.inlineData.data, 'base64'));
-
-  return `assets/social/generated/${filename}`;
-}
-
-async function generateImageWithPollinations(imagePrompt) {
-  const seed = Math.floor(Math.random() * 9999999);
-  const fullPrompt = `${imagePrompt} Ultra-luxury dark obsidian studio photography, brushed titanium, subtle electric lime #84cc16 rim lighting, high contrast, 16:9, no watermark`;
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1280&height=720&seed=${seed}&nologo=true`;
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
-  try {
-    const res = await fetch(url, { signal: controller.signal });
-    if (!res.ok) {
-      throw new Error(`Pollinations image error (${res.status})`);
-    }
-    const contentType = res.headers.get('content-type') || '';
-    if (!contentType.startsWith('image/')) {
-      throw new Error(`Pollinations returned non-image content-type: ${contentType}`);
-    }
-    const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.length < 5000) {
-      throw new Error(`Pollinations returned unexpectedly small image (${buf.length} bytes)`);
-    }
-    const ext = contentType.includes('png') ? 'png' : 'jpg';
-    const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
-    const rand = crypto.randomBytes(3).toString('hex');
-    const filename = `post-${stamp}-${rand}.${ext}`;
-
-    fs.mkdirSync(GENERATED_DIR, { recursive: true });
-    fs.writeFileSync(path.join(GENERATED_DIR, filename), buf);
-    return `assets/social/generated/${filename}`;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return cleaned;
 }
 
 function pruneOldGeneratedImages(maxAgeDays = 14) {
@@ -433,14 +282,13 @@ function getCountArg() {
 
 function buildScheduleSlots(count) {
   const now = Date.now();
-  const lagosOffsetMs = 60 * 60 * 1000; // UTC+1
+  const lagosOffsetMs = 60 * 60 * 1000;
   const nowLagos = new Date(now + lagosOffsetMs);
   const y = nowLagos.getUTCFullYear();
   const m = nowLagos.getUTCMonth();
   const d = nowLagos.getUTCDate();
 
-  // Window: 07:00 to 23:00 Africa/Lagos today (or tomorrow if past 22:00 Lagos)
-  let dayShift = nowLagos.getUTCHours() >= 22 ? 1 : 0;
+  const dayShift = nowLagos.getUTCHours() >= 22 ? 1 : 0;
   const windowStart = Date.UTC(y, m, d + dayShift, 7, 0, 0) - lagosOffsetMs;
   const windowEnd = Date.UTC(y, m, d + dayShift, 23, 0, 0) - lagosOffsetMs;
 
@@ -460,62 +308,47 @@ function buildScheduleSlots(count) {
   return slots;
 }
 
-function pickUnusedPoolImage(isPromo, history) {
-  const candidates = isPromo ? PROMO_POOL_IMAGES : ORGANIC_POOL_IMAGES;
-  const recentSet = new Set(
-    (Array.isArray(history) ? history : [])
-      .slice(-(candidates.length - 1))
-      .map((h) => h.imagePath)
-      .filter(Boolean)
-  );
-  const unused = candidates.filter((img) => !recentSet.has(img));
-  const pool = unused.length > 0 ? unused : candidates;
-  return pool[Math.floor(Math.random() * pool.length)];
-}
-
-async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt, forcedPillar, market, chartCoin }) {
-  const pillar = forcedPillar || pickWeightedPillar();
-  const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
-
-  let imagePath = pickUnusedPoolImage(pillar.isPromo, history);
+async function generateSinglePost({ mode, apiKey, siteUrl, history, timing, isPreview, dueAt, pool, pools }) {
+  const isPromo = mode === 'aurelias_promo';
+  let imagePath = pickUnusedPoolImage(isPromo, history);
   let imageSource = 'curated-pool';
   let chartInfo = null;
 
-  if (!pillar.isPromo && !isPreview) {
+  if (!isPromo && !isPreview) {
     try {
-      const coin = chartCoin || (market?.chartCoins || [])[0];
-      if (coin) {
-        const candles = await fetchOhlcCandles(coin);
-        chartInfo = renderCandlestickChartPng(coin, candles);
+      if (mode === 'desk_scorecard' && pools?.length >= 3) {
+        imagePath = renderDeskScorecardPng(pools);
+        imageSource = 'desk-scorecard-png';
+      } else if (pool) {
+        const candles = await fetchOhlcCandles(pool);
+        chartInfo = renderCandlestickChartPng(pool, candles);
         imagePath = chartInfo.imagePath;
-        imageSource = 'live-chart-4h';
+        imageSource = 'dex-1h-audit-png';
       }
     } catch (err) {
-      console.warn('Live chart render failed, using curated pool:', err.message);
+      console.warn(`Visual render failed for ${mode}, using curated pool:`, err.message);
     }
   }
 
-  let post;
+  let text;
   let copySource = 'fallback';
   if (apiKey) {
     try {
-      post = await generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing, market, chartInfo);
+      text = await generateCopyWithGemini({ apiKey, mode, siteUrl, history, timing, pool, pools, chartInfo });
       copySource = 'gemini-3.8-flash';
     } catch (err) {
       console.warn('Gemini copy generation failed, using fallback:', err.message);
-      post = buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo);
+      text = buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo });
     }
   } else {
-    post = buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo);
+    text = buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo });
   }
 
   return {
-    pillar: pillar.id,
-    isPromo: pillar.isPromo,
-    text: post.text,
-    angle: post.angle,
-    score: post.score || null,
-    imagePrompt: post.imagePrompt,
+    pillar: mode,
+    isPromo,
+    text,
+    symbol: pool?.symbol || null,
     imagePath,
     dueAt,
     copySource,
@@ -535,44 +368,36 @@ async function main() {
   const timing = getTimingContext();
   const slots = buildScheduleSlots(count);
   const market = await fetchLiveMarketSnapshot();
-  const chartCoins = market.chartCoins || [];
-  let chartIdx = 0;
+  const pools = market.pools || [];
 
   if (!isPreview) {
     pruneOldGeneratedImages(14);
   }
 
-  const organicPillars = PILLARS.filter((p) => !p.isPromo);
-  const promoPillar = PILLARS.find((p) => p.isPromo);
-  const promoIndex = count >= 3 ? Math.floor(Math.random() * count) : -1;
-
+  const modes = ['whale_flow', 'desk_scorecard', 'liquidity_audit', 'aurelias_promo'];
   const batch = [];
-  for (let i = 0; i < count; i += 1) {
-    let forcedPillar = null;
-    if (count > 1) {
-      forcedPillar =
-        i === promoIndex
-          ? promoPillar
-          : organicPillars[Math.floor(Math.random() * organicPillars.length)];
-    }
-    const chartCoin = chartCoins.length ? chartCoins[chartIdx % chartCoins.length] : null;
-    if (!forcedPillar?.isPromo) chartIdx += 1;
 
+  for (let i = 0; i < count; i += 1) {
+    const mode = modes[i % modes.length];
+    const pool = mode === 'liquidity_audit' ? pools[1] || pools[0] : pools[0];
     const item = await generateSinglePost({
+      mode,
       apiKey,
       siteUrl,
       history,
       timing,
       isPreview,
       dueAt: slots[i],
-      forcedPillar,
-      market,
-      chartCoin,
+      pool,
+      pools,
     });
     batch.push(item);
-    history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, imagePath: item.imagePath, text: item.text }].slice(-15);
+    history = [
+      ...history,
+      { at: new Date().toISOString(), pillar: item.pillar, imagePath: item.imagePath, text: item.text },
+    ].slice(-15);
     if (!isPreview && i < count - 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
   }
 
