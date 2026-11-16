@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Install chart renderer dependency
+        run: npm install --no-audit --no-fund
+
       - name: Generate 4 fresh posts and images for today's queue
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

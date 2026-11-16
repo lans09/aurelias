@@ -2,6 +2,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const dns = require('node:dns');
+const {
+  fetchLiveMarketSnapshot,
+  fetchOhlcCandles,
+  renderCandlestickChartPng,
+  fmtPrice,
+} = require('./market-chart');
 
 dns.setDefaultResultOrder('ipv4first');
 
@@ -197,14 +203,33 @@ function sanitizeTweet(raw, siteUrl, includeUrl) {
   return text;
 }
 
-function buildFallbackPost(siteUrl, pillar, angle, timing) {
+function buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo) {
   if (!pillar.isPromo) {
+    if (chartInfo) {
+      const sym = chartInfo.symbol;
+      const decimals = sym === 'SOL' ? 2 : 0;
+      const p = fmtPrice(chartInfo.price, decimals);
+      const sup = fmtPrice(chartInfo.support, decimals);
+      const res = fmtPrice(chartInfo.resistance, decimals);
+      const chg = `${chartInfo.change24h >= 0 ? '+' : ''}${chartInfo.change24h.toFixed(1)}%`;
+      const chartLines = [
+        `${sym} 4H at ${p} (${chg} 24h). Key range is ${sup} support to ${res} resistance. Are you bidding the sweep or waiting for a breakout?`,
+        `${sym} sitting at ${p} right now. Either ${sup} holds on the 4H or we test lower liquidity before any bounce. Long or flat here?`,
+      ];
+      return {
+        text: chartLines[Math.floor(Math.random() * chartLines.length)],
+        angle: angle.name,
+        imagePrompt: angle.visualSeed,
+      };
+    }
+
+    const btc = market?.prices?.BTC?.usd ? fmtPrice(market.prices.BTC.usd, 0) : '$64k';
+    const sol = market?.prices?.SOL?.usd ? fmtPrice(market.prices.SOL.usd, 2) : '$71';
+    const eth = market?.prices?.ETH?.usd ? fmtPrice(market.prices.ETH.usd, 0) : '$1,800';
     const organicPool = [
-      'Most chop wipes out traders not because their macro thesis was wrong, but because they oversized into zero directional edge.',
-      'Spot CVD still leads healthy trends. When perps push higher while spot sells, liquidity sweeps usually follow.',
-      'Know your exact invalidation price before clicking buy. Conviction without an exit plan is just hope.',
-      'Never blind-sign unlimited token approvals on unfamiliar frontends. Keep hot execution wallets separate from cold storage.',
-      'Sitting on your hands during low-volume chop is still the hardest position to hold.',
+      `ETH at ${eth} vs SOL at ${sol}. If you can only hold one for the next 90 days, which one outperforms?`,
+      `BTC at ${btc} right now. Most traders are waiting for confirmation at the exact level they will end up chasing.`,
+      `Be honest: moving your stop to breakeven too early or having no stop at all, which one has cost you more money this year?`,
     ];
     const text = organicPool[Math.floor(Math.random() * organicPool.length)];
     return { text, angle: angle.name, imagePrompt: angle.visualSeed };
@@ -219,27 +244,38 @@ function buildFallbackPost(siteUrl, pillar, angle, timing) {
   return { text, angle: angle.name, imagePrompt: angle.visualSeed };
 }
 
-async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing) {
+async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing, market, chartInfo) {
   const endpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
   const recentTexts = history.slice(-8).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
+  const marketLines = [];
+  if (market?.prices?.BTC) marketLines.push(`BTC: ${fmtPrice(market.prices.BTC.usd, 0)} (${market.prices.BTC.change24h.toFixed(1)}% 24h)`);
+  if (market?.prices?.ETH) marketLines.push(`ETH: ${fmtPrice(market.prices.ETH.usd, 0)} (${market.prices.ETH.change24h.toFixed(1)}% 24h)`);
+  if (market?.prices?.SOL) marketLines.push(`SOL: ${fmtPrice(market.prices.SOL.usd, 2)} (${market.prices.SOL.change24h.toFixed(1)}% 24h)`);
+  if (chartInfo) {
+    const dec = chartInfo.symbol === 'SOL' ? 2 : 0;
+    marketLines.push(`Attached live 4H chart: ${chartInfo.symbol}/USD at ${fmtPrice(chartInfo.price, dec)}, 48h Low ${fmtPrice(chartInfo.support, dec)}, 48h High ${fmtPrice(chartInfo.resistance, dec)}`);
+  }
+  if (market?.trending?.length) marketLines.push(`Trending today: ${market.trending.join(', ')}`);
+  if (market?.headlines?.length) marketLines.push(`Headlines today: ${market.headlines.slice(0, 3).join(' | ')}`);
 
   const rules = [
-    'You write crisp, human, high-taste X (Twitter) posts for AURELIAS, a crypto trading company and execution desk.',
-    'Write like an experienced proprietary trader or desk analyst, NEVER like an AI copywriter or hype marketer.',
+    'You run the X (Twitter) account for AURELIAS, an active crypto trading desk.',
+    'Write short, raw, conversational Crypto X posts that make real traders stop and REPLY.',
+    'NEVER write generic textbook trading quotes ("chop wipes out traders", "patience is an edge", etc.). Reference real today prices, chart levels, or headlines.',
     'Hard bans (violating ANY of these is an instant fail):',
     '- NO em-dashes or en-dashes.',
     '- NO hashtags (#).',
     '- NO generic AI filler words: delve, tapestry, landscape, unlock, elevate, unleash, game-changer, revolutionize, buckle up, here is why, in a world where.',
     '- NO crypto bro slang or emojis: LFG, WAGMI, GM frens, to the moon, gem, rocket/fire/sparkle emojis.',
-    '- Under 255 characters total.',
+    '- Under 245 characters total.',
     pillar.isPromo
       ? `This is a PROMO post for AURELIAS Season 04. Facts: 50,000 USDC pool, 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC), $2 entry, ETH/BNB/USDT/TON/Solana/BTC, Chainlink VRF v2.5, 15-minute payment window. Timing urgency to include naturally: "${timing.label}". MUST include exact URL: ${siteUrl}`
-      : 'This is an ORGANIC post. Do NOT mention AURELIAS, giveaways, raffles, or include any URL. Sound like a genuine, thoughtful account.',
+      : 'This is an ORGANIC trader engagement post. Do NOT mention AURELIAS, giveaways, raffles, or include any URL. End with a direct question or polarizing take so traders reply.',
+    marketLines.length ? `LIVE MARKET DATA RIGHT NOW:\n${marketLines.join('\n')}` : '',
     recentTexts ? `Recent posts (DO NOT repeat these openers, phrasing, or angles):\n${recentTexts}` : '',
-    'Task: Draft 3 distinct candidates, score each 1-10 on originality and human naturalness, and output ONLY the highest-scoring candidate in JSON: { "bestTweet": "...", "score": 9, "imagePrompt": "..." }.',
-    'For "imagePrompt", describe a fresh 16:9 ultra-luxury dark obsidian (#08080a) editorial visual matching the tweet, with electric lime (#84cc16) accents. For organic posts, avoid putting promo text on the image.',
+    'Task: Draft 3 distinct candidates, score each 1-10 on how likely a real trader is to reply, and output ONLY the highest-scoring candidate in JSON: { "bestTweet": "...", "score": 9, "imagePrompt": "..." }.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -440,33 +476,39 @@ function pickUnusedPoolImage(isPromo, history) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt, forcedPillar }) {
+async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt, forcedPillar, market, chartSymbol }) {
   const pillar = forcedPillar || pickWeightedPillar();
   const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
+
+  let imagePath = pickUnusedPoolImage(pillar.isPromo, history);
+  let imageSource = 'curated-pool';
+  let chartInfo = null;
+
+  if (!pillar.isPromo && !isPreview) {
+    try {
+      const sym = chartSymbol || ['BTC', 'ETH', 'SOL'][Math.floor(Math.random() * 3)];
+      const candles = await fetchOhlcCandles(sym);
+      const chg = market?.prices?.[sym]?.change24h || 0;
+      chartInfo = renderCandlestickChartPng(sym, candles, chg);
+      imagePath = chartInfo.imagePath;
+      imageSource = 'live-chart-4h';
+    } catch (err) {
+      console.warn('Live chart render failed, using curated pool:', err.message);
+    }
+  }
 
   let post;
   let copySource = 'fallback';
   if (apiKey) {
     try {
-      post = await generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing);
+      post = await generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, timing, market, chartInfo);
       copySource = 'gemini-3.8-flash';
     } catch (err) {
       console.warn('Gemini copy generation failed, using fallback:', err.message);
-      post = buildFallbackPost(siteUrl, pillar, angle, timing);
+      post = buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo);
     }
   } else {
-    post = buildFallbackPost(siteUrl, pillar, angle, timing);
-  }
-
-  let imagePath = pickUnusedPoolImage(pillar.isPromo, history);
-  let imageSource = 'curated-pool';
-  if (!isPreview && apiKey && process.env.USE_GEMINI_IMAGES === '1') {
-    try {
-      imagePath = await generateImageWithGemini(apiKey, post.imagePrompt);
-      imageSource = 'gemini-2.5-flash-image';
-    } catch (err) {
-      console.warn('Gemini image generation failed, using curated pool:', err.message);
-    }
+    post = buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo);
   }
 
   return {
@@ -494,6 +536,9 @@ async function main() {
   let history = loadHistory();
   const timing = getTimingContext();
   const slots = buildScheduleSlots(count);
+  const market = await fetchLiveMarketSnapshot();
+  const chartOrder = ['BTC', 'SOL', 'ETH'];
+  let chartIdx = 0;
 
   if (!isPreview) {
     pruneOldGeneratedImages(14);
@@ -512,6 +557,9 @@ async function main() {
           ? promoPillar
           : organicPillars[Math.floor(Math.random() * organicPillars.length)];
     }
+    const chartSymbol = chartOrder[chartIdx % chartOrder.length];
+    if (!forcedPillar?.isPromo) chartIdx += 1;
+
     const item = await generateSinglePost({
       apiKey,
       siteUrl,
@@ -520,6 +568,8 @@ async function main() {
       isPreview,
       dueAt: slots[i],
       forcedPillar,
+      market,
+      chartSymbol,
     });
     batch.push(item);
     history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, imagePath: item.imagePath, text: item.text }].slice(-15);
