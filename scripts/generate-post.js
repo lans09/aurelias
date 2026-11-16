@@ -79,23 +79,35 @@ function hasBannedPattern(text) {
   return BANNED_PATTERNS.some((rx) => rx.test(text));
 }
 
+const HOOK_STYLES = [
+  'Lead with the most shocking contrast between paper FDV and real pool cash.',
+  'Lead with what smart money / whales are doing while retail chases green candles.',
+  'Lead with a blunt 1-sentence reality check on how fast thin pools slip when top holders exit.',
+  'Lead with the raw 24h volume turnover multiple vs pool depth, then deliver the verdict.',
+  'Lead with a deadpan observation about retail trader psychology on this exact setup.',
+  'Open with the exact wallet receipt or buy/sell orderflow skew, then explain what it signals.',
+];
+
 function sanitizeTweet(raw, siteUrl, includeUrl) {
   let text = String(raw || '')
     .replace(/[\u2014\u2013]/g, ', ')
     .replace(/#[a-z0-9_]+/gi, '')
-    .replace(/\s+/g, ' ')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 
   if (includeUrl && !text.includes(siteUrl)) {
-    text = `${text} ${siteUrl}`.trim();
+    text = `${text}\n\n${siteUrl}`.trim();
   }
 
   if (text.length > 275) {
     if (includeUrl) {
       const withoutUrl = text.replace(siteUrl, '').trim();
-      const maxBody = 274 - siteUrl.length;
+      const maxBody = 273 - siteUrl.length;
       const trimmed = withoutUrl.slice(0, maxBody).replace(/[,:;.\s]+$/, '');
-      text = `${trimmed}. ${siteUrl}`;
+      text = `${trimmed}.\n${siteUrl}`;
     } else {
       text = `${text.slice(0, 272).replace(/[,:;.\s]+$/, '')}.`;
     }
@@ -117,22 +129,23 @@ function pickUnusedPoolImage(isPromo, history) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-function buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo }) {
+function buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo, variantIdx = 0 }) {
   if (mode === 'aurelias_promo') {
-    const promoPool = [
-      `${timing.label}. AURELIAS Season 04 allocates 50,000 USDC across 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC) for a $2 entry. Zero wallet connect. ${siteUrl}`,
-      `${timing.label}. Most traders burn $15 a day in DEX slippage. Season 04 is a capped $2 entry for 36 shots at 50,000 USDC. ${siteUrl}`,
+    const promoVariants = [
+      `Traders happily burn $40 in DEX slippage aping thin pools, then overthink a capped $2 asymmetric bet.\n\n${timing.label}.\n• 1x 20,000 USDC\n• 5x 3,000 USDC\n• 30x 500 USDC\n\nZero wallet connect:\n${siteUrl}`,
+      `${timing.label}.\n\n50,000 USDC split across 36 winners instead of winner-takes-all:\n• 1x 20,000 USDC\n• 5x 3,000 USDC\n• 30x 500 USDC\n\n$2 entry from your own wallet app:\n${siteUrl}`,
+      `Most crypto draws ask for wallet-connect signatures. We don't.\n\nPaste your sending address, send $2, and lock in 36 shots at 50,000 USDC (${timing.hoursLeft}h left).\n${siteUrl}`,
     ];
-    return sanitizeTweet(promoPool[Math.floor(Math.random() * promoPool.length)], siteUrl, true);
+    return sanitizeTweet(promoVariants[variantIdx % promoVariants.length], siteUrl, true);
   }
 
   if (mode === 'desk_scorecard' && pools?.length >= 3) {
     const lines = pools.slice(0, 4).map((p) => {
       const g = p.gradeInfo?.grade || 'B';
-      return `$${p.symbol} (${fmtCompactUsd(p.vol24hUsd)} vol / ${fmtCompactUsd(p.liqUsd)} liq): Grade ${g}`;
+      return `• $${p.symbol}: ${fmtCompactUsd(p.vol24hUsd)} vol / ${fmtCompactUsd(p.liqUsd)} liq (${g})`;
     });
     return sanitizeTweet(
-      `On-chain desk scorecard: ${lines.join(' | ')}. Reply with a ticker + CA to queue it for the next liquidity audit.`,
+      `Today's on-chain liquidity scorecard:\n\n${lines.join('\n')}\n\nReply with a ticker + CA to queue it for the next desk audit.`,
       siteUrl,
       false
     );
@@ -141,82 +154,101 @@ function buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo }) {
   const target = chartInfo || pool;
   if (target) {
     const sym = target.symbol;
-    const g = target.gradeInfo || { grade: 'B', depthPct: 1.5, buyPct: 52, verdict: 'Active flow' };
+    const g = target.gradeInfo || { grade: 'B', depthPct: 1.5, buyPct: 52 };
     const vol = fmtCompactUsd(target.vol24hUsd);
     const liq = fmtCompactUsd(target.liqUsd);
     const fdv = fmtCompactUsd(target.fdvUsd);
+    const chg = Number(target.change24h || 0);
 
     if (mode === 'whale_flow' && target.whale) {
       const w = target.whale;
+      const actionVerb = w.kind === 'SELL' ? 'dumped into' : 'accumulated';
       return sanitizeTweet(
-        `On-chain flow alert on $${sym}: wallet ${shortAddr(w.wallet)} executed a ${fmtCompactUsd(w.usd)} ${w.kind} as 24h volume reached ${vol} against ${liq} liquidity (${fdv} FDV). Desk Grade: ${g.grade} (${g.verdict}).`,
+        `Wallet ${shortAddr(w.wallet)} just ${actionVerb} $${sym} (${fmtCompactUsd(w.usd)} clip) while 24h volume hit ${vol}.\n\n• Pool cash: ${liq} (${fdv} FDV)\n• Orderflow: ${g.buyPct}% buys\n\nWhales use high-volume candles for liquidity. Watch ${liq} pool depth closely.`,
+        siteUrl,
+        false
+      );
+    }
+
+    if (g.depthPct < 1.2) {
+      return sanitizeTweet(
+        `Retail is trading $${sym} at a ${fdv} valuation right now.\n\nThere is only ${liq} of real cash in the liquidity pool (${g.depthPct.toFixed(1)}% depth).\n\nIf two early wallets exit at once, that chart drops 50% in one candle. Check depth before chasing.`,
         siteUrl,
         false
       );
     }
 
     return sanitizeTweet(
-      `Liquidity audit on $${sym}: ${vol} 24h volume on ${liq} liquidity (${g.depthPct.toFixed(1)}% of ${fdv} FDV, ${g.buyPct}% buys). Desk Grade: ${g.grade}. ${g.verdict}.`,
+      `$${sym} cleared ${vol} in 24h volume (${chg >= 0 ? '+' : ''}${chg.toFixed(1)}%) backed by ${liq} in real pool liquidity.\n\n• Buy ratio: ${g.buyPct}% across 24h trades\n• Valuation: ${fdv} FDV\n\nReal spot absorption instead of paper thin air.`,
       siteUrl,
       false
     );
   }
 
-  return 'AURELIAS Desk: Always verify pool liquidity depth relative to FDV before sizing into trending on-chain runners.';
+  return 'Crypto traders will lose $300 aping an unlocked pool in 4 minutes, then spend 3 days overthinking a $2 capped-risk bet.';
 }
 
-async function generateCopyWithGemini({ apiKey, mode, siteUrl, history, timing, pool, pools, chartInfo }) {
+async function generateCopyWithGemini({ apiKey, mode, siteUrl, history, timing, pool, pools, chartInfo, hookStyle }) {
   const endpoint =
     'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
 
-  const recentTexts = history.slice(-6).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
+  const recentTexts = history.slice(-8).map((h, i) => `${i + 1}. ${h.text.replace(/\n+/g, ' / ')}`).join('\n');
   const target = chartInfo || pool;
 
   let modeBrief = '';
   if (mode === 'whale_flow' && target) {
     const g = target.gradeInfo || {};
     const whaleStr = target.whale
-      ? `Top whale swap: wallet ${shortAddr(target.whale.wallet)} ${target.whale.kind} ${fmtCompactUsd(target.whale.usd)}`
-      : `Buy ratio: ${g.buyPct}% (${target.buys24h} buys vs ${target.sells24h} sells)`;
+      ? `Live whale trade: wallet ${shortAddr(target.whale.wallet)} executed a ${fmtCompactUsd(target.whale.usd)} ${target.whale.kind}`
+      : `Orderflow skew: ${g.buyPct}% buys (${target.buys24h} buys vs ${target.sells24h} sells)`;
     modeBrief = [
-      'Format: Institutional Whale Flow Alert (@lookonchain / @spotonchain style).',
-      `Token: $${target.symbol} (${target.network})`,
-      `Price: ${fmtPrice(target.price || target.priceUsd)} (${Number(target.change24h || 0).toFixed(1)}% 24h)`,
-      `Metrics: 24h Vol ${fmtCompactUsd(target.vol24hUsd)}, Liquidity ${fmtCompactUsd(target.liqUsd)} (${(g.depthPct || 0).toFixed(1)}% of ${fmtCompactUsd(target.fdvUsd)} FDV)`,
+      'Archetype: Whale vs. Retail Play-by-Play (@lookonchain style).',
+      `Hook style for this post: ${hookStyle}`,
+      `Token: $${target.symbol} on ${target.network} (${Number(target.change24h || 0).toFixed(1)}% 24h)`,
+      `Anomaly: ${target.anomaly?.headline || ''}`,
+      `Numbers: 24h Vol ${fmtCompactUsd(target.vol24hUsd)}, Real Pool Cash ${fmtCompactUsd(target.liqUsd)}, Valuation ${fmtCompactUsd(target.fdvUsd)} FDV (${(g.depthPct || 0).toFixed(1)}% depth)`,
       whaleStr,
-      `Desk Grade: ${g.grade} (${g.verdict}). State a definitive desk read with these exact numbers. Do NOT ask a question.`,
+      'Write a 3-part tweet separated by blank lines (\\n\\n): 1) Blunt human hook about what this wallet/flow is doing, 2) 2 short bullet points with the key numbers, 3) Sharp 1-line trader takeaway. Do NOT ask a question.',
     ].join('\n');
   } else if (mode === 'liquidity_audit' && target) {
     const g = target.gradeInfo || {};
     modeBrief = [
-      'Format: Institutional Liquidity & Slippage Audit (@bubblemaps style).',
-      `Token: $${target.symbol} (${target.network})`,
-      `Metrics: ${fmtCompactUsd(target.vol24hUsd)} 24h volume vs ${fmtCompactUsd(target.liqUsd)} liquidity (${(g.depthPct || 0).toFixed(1)}% depth against ${fmtCompactUsd(target.fdvUsd)} FDV, ${g.buyPct}% buys).`,
-      chartInfo ? `12H Range: ${fmtPrice(chartInfo.support, chartInfo.decimals)} low to ${fmtPrice(chartInfo.resistance, chartInfo.decimals)} high.` : '',
-      `Desk Grade: ${g.grade} (${g.verdict}). Publish a hard, number-backed liquidity verdict. Do NOT ask a wishy-washy question.`,
+      'Archetype: Paper Market Cap vs. Real Pool Cash Exposé (@zachxbt / @bubblemaps style).',
+      `Hook style for this post: ${hookStyle}`,
+      `Token: $${target.symbol} on ${target.network}`,
+      `Anomaly: ${target.anomaly?.headline || ''}`,
+      `Numbers: ${fmtCompactUsd(target.fdvUsd)} FDV valuation vs ${fmtCompactUsd(target.liqUsd)} real liquidity (${(g.depthPct || 0).toFixed(1)}% depth), ${fmtCompactUsd(target.vol24hUsd)} 24h volume, ${g.buyPct}% buys.`,
+      chartInfo ? `12H chart range: ${fmtPrice(chartInfo.support, chartInfo.decimals)} to ${fmtPrice(chartInfo.resistance, chartInfo.decimals)}.` : '',
+      'Write a 3-part tweet separated by blank lines (\\n\\n) in plain, blunt human English exposing either the trapdoor liquidity risk or confirming real liquidity backing. Never sound like a robotic scanner log.',
     ].filter(Boolean).join('\n');
   } else if (mode === 'desk_scorecard' && pools?.length) {
     const rows = pools.slice(0, 4).map(
       (p) => `$${p.symbol}: ${fmtCompactUsd(p.vol24hUsd)} vol / ${fmtCompactUsd(p.liqUsd)} liq (${p.gradeInfo?.depthPct.toFixed(1)}% depth) -> Grade ${p.gradeInfo?.grade}`
     );
     modeBrief = [
-      'Format: 4-Coin On-Chain Desk Scorecard.',
+      'Archetype: 4-Coin On-Chain Liquidity Scorecard.',
       `Coins:\n${rows.join('\n')}`,
-      'List all 4 $TICKERs with their key volume/liquidity stat and Grade (A to D), and end with: "Reply with a ticker + CA for the next desk audit."',
+      'Format with clean line breaks (\\n): 1 short opener line, 4 bullet lines (• $TICKER: vol / liq · Grade X), and end with: "Reply with a ticker + CA to queue it for the next desk audit."',
     ].join('\n');
   } else {
-    modeBrief = `Format: AURELIAS Season 04 Promo. Facts: 50,000 USDC pool across 36 winners (1x 20,000, 5x 3,000, 30x 500 USDC), $2 entry, zero wallet connect, 15-min payment window. Timing: "${timing.label}". MUST include exact URL: ${siteUrl}`;
+    modeBrief = [
+      'Archetype: Deadpan Retail Psychology -> Season 04 Hook (@cobie style).',
+      `Hook style: Contrast how traders casually lose $30-$100 in slippage/gas aping bad pools vs a capped $2 entry for 36 shots at 50,000 USDC (1x 20k, 5x 3k, 30x 500).`,
+      `Urgency: ${timing.label}. Zero wallet connect.`,
+      `Use clean line breaks (\\n\\n) and end with the exact URL: ${siteUrl}`,
+    ].join('\n');
   }
 
   const rules = [
-    'You are the lead analyst for AURELIAS, an institutional crypto trading and on-chain flow desk.',
-    'Strict rules:',
-    '- Under 255 characters total.',
-    '- NO em-dashes or en-dashes.',
-    '- NO hashtags (#) and NO emojis.',
-    '- Always prefix token symbols with $ (e.g. $CASHCAT, $MIHAO).',
-    '- Sound authoritative, sharp, and data-dense. Never use generic AI filler.',
-    recentTexts ? `Recent posts (do not repeat):\n${recentTexts}` : '',
+    'You write high-engagement Crypto Twitter (X) posts for AURELIAS, an on-chain trading and liquidity desk.',
+    'Strict formatting & voice rules:',
+    '- Under 260 characters total.',
+    '- Use line breaks (\\n\\n) between short 1-sentence lines so the tweet is effortless to scan.',
+    '- NEVER write robotic scanner logs ("Liquidity audit on $X:", "Desk Grade: B"). Write in blunt, plain-English human prose.',
+    '- NEVER repeat the sentence structure or opening phrasing of any recent post listed below.',
+    '- NO em-dashes, NO hashtags (#), NO emojis.',
+    '- Always prefix token symbols with $ (e.g. $CASHCAT).',
+    recentTexts ? `Recent posts (NEVER repeat these openings or structures):\n${recentTexts}` : '',
     'Return JSON: { "bestTweet": "..." }.',
   ].filter(Boolean).join('\n');
 
@@ -308,7 +340,7 @@ function buildScheduleSlots(count) {
   return slots;
 }
 
-async function generateSinglePost({ mode, apiKey, siteUrl, history, timing, isPreview, dueAt, pool, pools }) {
+async function generateSinglePost({ mode, apiKey, siteUrl, history, timing, isPreview, dueAt, pool, pools, hookStyle, variantIdx }) {
   const isPromo = mode === 'aurelias_promo';
   let imagePath = pickUnusedPoolImage(isPromo, history);
   let imageSource = 'curated-pool';
@@ -334,14 +366,14 @@ async function generateSinglePost({ mode, apiKey, siteUrl, history, timing, isPr
   let copySource = 'fallback';
   if (apiKey) {
     try {
-      text = await generateCopyWithGemini({ apiKey, mode, siteUrl, history, timing, pool, pools, chartInfo });
+      text = await generateCopyWithGemini({ apiKey, mode, siteUrl, history, timing, pool, pools, chartInfo, hookStyle });
       copySource = 'gemini-3.8-flash';
     } catch (err) {
       console.warn('Gemini copy generation failed, using fallback:', err.message);
-      text = buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo });
+      text = buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo, variantIdx });
     }
   } else {
-    text = buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo });
+    text = buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo, variantIdx });
   }
 
   return {
@@ -365,9 +397,10 @@ async function main() {
     ? rawSiteUrl
     : `${rawSiteUrl}${rawSiteUrl.includes('?') ? '&' : '?'}ref=x`;
   let history = loadHistory();
+  const usedSymbols = new Set(history.slice(-12).map((h) => h.symbol).filter(Boolean));
   const timing = getTimingContext();
   const slots = buildScheduleSlots(count);
-  const market = await fetchLiveMarketSnapshot();
+  const market = await fetchLiveMarketSnapshot(usedSymbols);
   const pools = market.pools || [];
 
   if (!isPreview) {
@@ -376,10 +409,15 @@ async function main() {
 
   const modes = ['whale_flow', 'desk_scorecard', 'liquidity_audit', 'aurelias_promo'];
   const batch = [];
+  let poolCursor = 0;
 
   for (let i = 0; i < count; i += 1) {
     const mode = modes[i % modes.length];
-    const pool = mode === 'liquidity_audit' ? pools[1] || pools[0] : pools[0];
+    const pool =
+      mode === 'whale_flow' || mode === 'liquidity_audit'
+        ? pools[poolCursor++ % Math.max(1, pools.length)]
+        : pools[0];
+    const hookStyle = HOOK_STYLES[(history.length + i) % HOOK_STYLES.length];
     const item = await generateSinglePost({
       mode,
       apiKey,
@@ -390,12 +428,20 @@ async function main() {
       dueAt: slots[i],
       pool,
       pools,
+      hookStyle,
+      variantIdx: history.length + i,
     });
     batch.push(item);
     history = [
       ...history,
-      { at: new Date().toISOString(), pillar: item.pillar, imagePath: item.imagePath, text: item.text },
-    ].slice(-15);
+      {
+        at: new Date().toISOString(),
+        pillar: item.pillar,
+        symbol: item.symbol,
+        imagePath: item.imagePath,
+        text: item.text,
+      },
+    ].slice(-20);
     if (!isPreview && i < count - 1) {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     }

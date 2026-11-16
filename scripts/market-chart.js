@@ -92,6 +92,49 @@ function computePoolGrade(pool) {
   };
 }
 
+function detectPoolAnomaly(pool) {
+  const liq = Number(pool.liqUsd || 0);
+  const fdv = Math.max(Number(pool.fdvUsd || 0), liq);
+  const vol = Number(pool.vol24hUsd || 0);
+  const g = pool.gradeInfo || computePoolGrade(pool);
+  const turnover = liq > 0 ? vol / liq : 0;
+
+  if (fdv > 5000000 && g.depthPct < 1.1) {
+    return {
+      type: 'paper_fdv_trap',
+      headline: `$${pool.symbol} is trading at a ${fmtCompactUsd(fdv)} valuation with only ${fmtCompactUsd(liq)} in real pool cash (${g.depthPct.toFixed(1)}% depth).`,
+    };
+  }
+  if (pool.ageHours && pool.ageHours <= 72 && vol >= 500000) {
+    return {
+      type: 'new_launch_spike',
+      headline: `Launched ${pool.ageHours}h ago on ${pool.network}, $${pool.symbol} has already cleared ${fmtCompactUsd(vol)} in 24h volume against ${fmtCompactUsd(liq)} liquidity.`,
+    };
+  }
+  if (turnover >= 4.5) {
+    return {
+      type: 'volume_frenzy',
+      headline: `$${pool.symbol} turned over its entire ${fmtCompactUsd(liq)} liquidity pool ${turnover.toFixed(1)}x in the last 24 hours (${fmtCompactUsd(vol)} volume).`,
+    };
+  }
+  if (g.buyPct >= 57) {
+    return {
+      type: 'heavy_accumulation',
+      headline: `Buyers are dominating $${pool.symbol} orderflow (${g.buyPct}% buy ratio across ${pool.buys24h + pool.sells24h} trades, ${fmtCompactUsd(vol)} 24h vol).`,
+    };
+  }
+  if (g.buyPct <= 44) {
+    return {
+      type: 'distribution_pressure',
+      headline: `Early holders are distributing into $${pool.symbol} volume (${100 - g.buyPct}% sell ratio on ${fmtCompactUsd(vol)} 24h volume).`,
+    };
+  }
+  return {
+    type: 'deep_liquidity_leader',
+    headline: `$${pool.symbol} is holding ${fmtCompactUsd(liq)} in real liquidity (${g.depthPct.toFixed(1)}% of ${fmtCompactUsd(fdv)} FDV) with ${fmtCompactUsd(vol)} 24h volume.`,
+  };
+}
+
 async function fetchJson(url, timeoutMs = 10000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -104,49 +147,66 @@ async function fetchJson(url, timeoutMs = 10000) {
   }
 }
 
-async function fetchLiveMarketSnapshot() {
+async function fetchLiveMarketSnapshot(usedSymbols = new Set()) {
   const snapshot = { pools: [], chartCoins: [], trending: [], headlines: [] };
+  const endpoints = [
+    'https://api.geckoterminal.com/api/v2/networks/trending_pools?page=1',
+    'https://api.geckoterminal.com/api/v2/networks/solana/trending_pools?page=1',
+    'https://api.geckoterminal.com/api/v2/networks/base/trending_pools?page=1',
+  ];
 
-  try {
-    const d = await fetchJson('https://api.geckoterminal.com/api/v2/networks/trending_pools?page=1');
-    const rawPools = d.data || [];
+  const seenSymbols = new Set(usedSymbols);
 
-    for (const p of rawPools) {
-      const attr = p.attributes || {};
-      const rawName = String(attr.name || '');
-      const baseSymbol = rawName.split('/')[0].trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (!baseSymbol || EXCLUDED_SYMBOLS.has(baseSymbol)) continue;
+  for (const url of endpoints) {
+    try {
+      const d = await fetchJson(url);
+      const rawPools = d.data || [];
 
-      const [network, poolAddress] = String(p.id || '').split('_');
-      if (!network || !poolAddress) continue;
+      for (const p of rawPools) {
+        const attr = p.attributes || {};
+        const rawName = String(attr.name || '');
+        const baseSymbol = rawName.split('/')[0].trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (!baseSymbol || EXCLUDED_SYMBOLS.has(baseSymbol) || seenSymbols.has(baseSymbol)) continue;
 
-      const liqUsd = Number(attr.reserve_in_usd || 0);
-      const vol24hUsd = Number(attr.volume_usd?.h24 || 0);
-      if (liqUsd < 25000 || vol24hUsd < 80000) continue;
+        const [network, poolAddress] = String(p.id || '').split('_');
+        if (!network || !poolAddress) continue;
 
-      const buys24h = Number(attr.transactions?.h24?.buys || 0);
-      const sells24h = Number(attr.transactions?.h24?.sells || 0);
-      const poolObj = {
-        id: p.id,
-        network,
-        poolAddress,
-        symbol: baseSymbol,
-        pairName: rawName,
-        priceUsd: Number(attr.base_token_price_usd || 0),
-        change24h: Number(attr.price_change_percentage?.h24 || 0),
-        vol24hUsd,
-        liqUsd,
-        fdvUsd: Number(attr.fdv_usd || attr.market_cap_usd || liqUsd * 10),
-        buys24h,
-        sells24h,
-        whale: null,
-      };
-      poolObj.gradeInfo = computePoolGrade(poolObj);
-      snapshot.pools.push(poolObj);
-      if (snapshot.pools.length >= 6) break;
+        const liqUsd = Number(attr.reserve_in_usd || 0);
+        const vol24hUsd = Number(attr.volume_usd?.h24 || 0);
+        if (liqUsd < 25000 || vol24hUsd < 80000) continue;
+
+        seenSymbols.add(baseSymbol);
+        const buys24h = Number(attr.transactions?.h24?.buys || 0);
+        const sells24h = Number(attr.transactions?.h24?.sells || 0);
+        const fdvUsd = Number(attr.fdv_usd || attr.market_cap_usd || liqUsd * 10);
+        const poolCreatedAt = attr.pool_created_at ? Date.parse(attr.pool_created_at) : null;
+        const ageHours = poolCreatedAt ? Math.max(1, Math.round((Date.now() - poolCreatedAt) / 3600000)) : null;
+
+        const poolObj = {
+          id: p.id,
+          network,
+          poolAddress,
+          symbol: baseSymbol,
+          pairName: rawName,
+          priceUsd: Number(attr.base_token_price_usd || 0),
+          change24h: Number(attr.price_change_percentage?.h24 || 0),
+          vol24hUsd,
+          liqUsd,
+          fdvUsd,
+          buys24h,
+          sells24h,
+          ageHours,
+          whale: null,
+        };
+        poolObj.gradeInfo = computePoolGrade(poolObj);
+        poolObj.anomaly = detectPoolAnomaly(poolObj);
+        snapshot.pools.push(poolObj);
+        if (snapshot.pools.length >= 10) break;
+      }
+      if (snapshot.pools.length >= 10) break;
+    } catch (err) {
+      console.warn('GeckoTerminal pool fetch warning:', err.message);
     }
-  } catch (err) {
-    console.warn('GeckoTerminal trending_pools fetch failed:', err.message);
   }
 
   // Enrich top 2 pools with live whale trade data
