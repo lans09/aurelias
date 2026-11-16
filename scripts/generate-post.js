@@ -440,8 +440,8 @@ function pickUnusedPoolImage(isPromo, history) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt }) {
-  const pillar = pickWeightedPillar();
+async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt, forcedPillar }) {
+  const pillar = forcedPillar || pickWeightedPillar();
   const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
 
   let post;
@@ -499,8 +499,19 @@ async function main() {
     pruneOldGeneratedImages(14);
   }
 
+  const organicPillars = PILLARS.filter((p) => !p.isPromo);
+  const promoPillar = PILLARS.find((p) => p.isPromo);
+  const promoIndex = count >= 3 ? Math.floor(Math.random() * count) : -1;
+
   const batch = [];
   for (let i = 0; i < count; i += 1) {
+    let forcedPillar = null;
+    if (count > 1) {
+      forcedPillar =
+        i === promoIndex
+          ? promoPillar
+          : organicPillars[Math.floor(Math.random() * organicPillars.length)];
+    }
     const item = await generateSinglePost({
       apiKey,
       siteUrl,
@@ -508,6 +519,7 @@ async function main() {
       timing,
       isPreview,
       dueAt: slots[i],
+      forcedPillar,
     });
     batch.push(item);
     history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, imagePath: item.imagePath, text: item.text }].slice(-15);
