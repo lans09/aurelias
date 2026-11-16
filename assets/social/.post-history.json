@@ -1,33 +1,5 @@
 [
   {
-    "at": "2026-11-15T16:06:59.070Z",
-    "pillar": "onchain",
-    "angle": "Speed vs Finality",
-    "imagePath": "assets/social/pool/organic-obsidian-prism.jpg",
-    "text": "A wire transfer takes three days not because data moves slowly, but because clearinghouses need time to manage counterparty risk. Cryptographic finality eliminates the delay by verifying state instantly. Architecture always beats bureaucracy."
-  },
-  {
-    "at": "2026-11-15T16:07:02.934Z",
-    "pillar": "psychology",
-    "angle": "Asymmetric Risk",
-    "imagePath": "assets/social/pool/organic-titanium-rings.jpg",
-    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
-  },
-  {
-    "at": "2026-11-15T16:07:06.479Z",
-    "pillar": "onchain",
-    "angle": "Stablecoin Settlement Reality",
-    "imagePath": "assets/social/pool/organic-obsidian-basalt.jpg",
-    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
-  },
-  {
-    "at": "2026-11-15T16:07:08.648Z",
-    "pillar": "fairness",
-    "angle": "Public Auditability",
-    "imagePath": "assets/social/pool/organic-obsidian-hero.jpg",
-    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
-  },
-  {
     "at": "2026-11-15T16:10:19.365Z",
     "pillar": "onchain",
     "angle": "Multi-Chain UX Friction",
@@ -103,5 +75,33 @@
     "angle": "Asymmetric Risk",
     "imagePath": "assets/social/pool/organic-obsidian-hero.jpg",
     "text": "Quiet execution and clean design always outlast loud hype."
+  },
+  {
+    "at": "2026-11-16T13:19:19.291Z",
+    "pillar": "aurelias_promo",
+    "angle": "60-Second Multi-Chain Entry",
+    "imagePath": "assets/social/pool/promo-multichain-vrf.jpg",
+    "text": "34h remaining in the current 72h Season 04 window. 36 winners share 50,000 USDC in AURELIAS Season 04 for a $2 entry. https://www.evmsync.live/?ref=x"
+  },
+  {
+    "at": "2026-11-16T13:21:38.569Z",
+    "pillar": "onchain",
+    "angle": "Multi-Chain UX Friction",
+    "imagePath": "assets/social/pool/organic-titanium-chronograph.jpg",
+    "text": "Forcing people to manage three gas tokens, switch RPCs, and bridge funds just to send $2 is product failure disguised as decentralization. The plumbing belongs under the floorboards."
+  },
+  {
+    "at": "2026-11-16T13:21:41.512Z",
+    "pillar": "onchain",
+    "angle": "Speed vs Finality",
+    "imagePath": "assets/social/pool/organic-obsidian-basalt.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-16T13:26:44.287Z",
+    "pillar": "psychology",
+    "angle": "Patience in Markets",
+    "imagePath": "assets/social/pool/organic-obsidian-prism.jpg",
+    "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
   }
 ]
