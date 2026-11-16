@@ -207,14 +207,14 @@ function buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo) {
   if (!pillar.isPromo) {
     if (chartInfo) {
       const sym = chartInfo.symbol;
-      const decimals = sym === 'SOL' ? 2 : 0;
+      const decimals = chartInfo.decimals;
       const p = fmtPrice(chartInfo.price, decimals);
       const sup = fmtPrice(chartInfo.support, decimals);
       const res = fmtPrice(chartInfo.resistance, decimals);
       const chg = `${chartInfo.change24h >= 0 ? '+' : ''}${chartInfo.change24h.toFixed(1)}%`;
       const chartLines = [
-        `${sym} 4H at ${p} (${chg} 24h). Key range is ${sup} support to ${res} resistance. Are you bidding the sweep or waiting for a breakout?`,
-        `${sym} sitting at ${p} right now. Either ${sup} holds on the 4H or we test lower liquidity before any bounce. Long or flat here?`,
+        `$${sym} 4H at ${p} (${chg} 24h). Key range is ${sup} support to ${res} resistance. Are you bidding the sweep or waiting for a breakout?`,
+        `$${sym} sitting at ${p} right now. Either ${sup} holds on the 4H or we test lower liquidity before any bounce. Long or flat here?`,
       ];
       return {
         text: chartLines[Math.floor(Math.random() * chartLines.length)],
@@ -223,12 +223,12 @@ function buildFallbackPost(siteUrl, pillar, angle, timing, market, chartInfo) {
       };
     }
 
-    const btc = market?.prices?.BTC?.usd ? fmtPrice(market.prices.BTC.usd, 0) : '$64k';
-    const sol = market?.prices?.SOL?.usd ? fmtPrice(market.prices.SOL.usd, 2) : '$71';
-    const eth = market?.prices?.ETH?.usd ? fmtPrice(market.prices.ETH.usd, 0) : '$1,800';
+    const topAlts = market?.chartCoins || [];
+    const altA = topAlts[0]?.symbol || 'TAO';
+    const altB = topAlts[1]?.symbol || 'SUI';
     const organicPool = [
-      `ETH at ${eth} vs SOL at ${sol}. If you can only hold one for the next 90 days, which one outperforms?`,
-      `BTC at ${btc} right now. Most traders are waiting for confirmation at the exact level they will end up chasing.`,
+      `$${altA} vs $${altB}. If you can only hold one trending mid-cap for the next 30 days, which one outperforms?`,
+      `Watching $${altA} flow today. Most traders wait for confirmation at the exact level they end up chasing.`,
       `Be honest: moving your stop to breakeven too early or having no stop at all, which one has cost you more money this year?`,
     ];
     const text = organicPool[Math.floor(Math.random() * organicPool.length)];
@@ -250,14 +250,11 @@ async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, t
 
   const recentTexts = history.slice(-8).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
   const marketLines = [];
-  if (market?.prices?.BTC) marketLines.push(`BTC: ${fmtPrice(market.prices.BTC.usd, 0)} (${market.prices.BTC.change24h.toFixed(1)}% 24h)`);
-  if (market?.prices?.ETH) marketLines.push(`ETH: ${fmtPrice(market.prices.ETH.usd, 0)} (${market.prices.ETH.change24h.toFixed(1)}% 24h)`);
-  if (market?.prices?.SOL) marketLines.push(`SOL: ${fmtPrice(market.prices.SOL.usd, 2)} (${market.prices.SOL.change24h.toFixed(1)}% 24h)`);
   if (chartInfo) {
-    const dec = chartInfo.symbol === 'SOL' ? 2 : 0;
-    marketLines.push(`Attached live 4H chart: ${chartInfo.symbol}/USD at ${fmtPrice(chartInfo.price, dec)}, 48h Low ${fmtPrice(chartInfo.support, dec)}, 48h High ${fmtPrice(chartInfo.resistance, dec)}`);
+    const dec = chartInfo.decimals;
+    marketLines.push(`Attached live 4H chart: $${chartInfo.symbol} (${chartInfo.name || chartInfo.symbol}) at ${fmtPrice(chartInfo.price, dec)}, 24h ${chartInfo.change24h.toFixed(1)}%, 48h Low ${fmtPrice(chartInfo.support, dec)}, 48h High ${fmtPrice(chartInfo.resistance, dec)}`);
   }
-  if (market?.trending?.length) marketLines.push(`Trending today: ${market.trending.join(', ')}`);
+  if (market?.trending?.length) marketLines.push(`Trending altcoins today: ${market.trending.join(', ')}`);
   if (market?.headlines?.length) marketLines.push(`Headlines today: ${market.headlines.slice(0, 3).join(' | ')}`);
 
   const rules = [
@@ -476,7 +473,7 @@ function pickUnusedPoolImage(isPromo, history) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt, forcedPillar, market, chartSymbol }) {
+async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview, dueAt, forcedPillar, market, chartCoin }) {
   const pillar = forcedPillar || pickWeightedPillar();
   const angle = pillar.angles[Math.floor(Math.random() * pillar.angles.length)];
 
@@ -486,12 +483,13 @@ async function generateSinglePost({ apiKey, siteUrl, history, timing, isPreview,
 
   if (!pillar.isPromo && !isPreview) {
     try {
-      const sym = chartSymbol || ['BTC', 'ETH', 'SOL'][Math.floor(Math.random() * 3)];
-      const candles = await fetchOhlcCandles(sym);
-      const chg = market?.prices?.[sym]?.change24h || 0;
-      chartInfo = renderCandlestickChartPng(sym, candles, chg);
-      imagePath = chartInfo.imagePath;
-      imageSource = 'live-chart-4h';
+      const coin = chartCoin || (market?.chartCoins || [])[0];
+      if (coin) {
+        const candles = await fetchOhlcCandles(coin);
+        chartInfo = renderCandlestickChartPng(coin, candles);
+        imagePath = chartInfo.imagePath;
+        imageSource = 'live-chart-4h';
+      }
     } catch (err) {
       console.warn('Live chart render failed, using curated pool:', err.message);
     }
@@ -537,7 +535,7 @@ async function main() {
   const timing = getTimingContext();
   const slots = buildScheduleSlots(count);
   const market = await fetchLiveMarketSnapshot();
-  const chartOrder = ['BTC', 'SOL', 'ETH'];
+  const chartCoins = market.chartCoins || [];
   let chartIdx = 0;
 
   if (!isPreview) {
@@ -557,7 +555,7 @@ async function main() {
           ? promoPillar
           : organicPillars[Math.floor(Math.random() * organicPillars.length)];
     }
-    const chartSymbol = chartOrder[chartIdx % chartOrder.length];
+    const chartCoin = chartCoins.length ? chartCoins[chartIdx % chartCoins.length] : null;
     if (!forcedPillar?.isPromo) chartIdx += 1;
 
     const item = await generateSinglePost({
@@ -569,7 +567,7 @@ async function main() {
       dueAt: slots[i],
       forcedPillar,
       market,
-      chartSymbol,
+      chartCoin,
     });
     batch.push(item);
     history = [...history, { at: new Date().toISOString(), pillar: item.pillar, angle: item.angle, imagePath: item.imagePath, text: item.text }].slice(-15);

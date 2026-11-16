@@ -5,16 +5,34 @@ const { Resvg } = require('@resvg/resvg-js');
 
 const GENERATED_DIR = path.join(__dirname, '..', 'assets', 'social', 'generated');
 
-const TICKERS = {
-  BTC: { id: 'bitcoin', pair: 'BTC / USD', decimals: 0 },
-  ETH: { id: 'ethereum', pair: 'ETH / USD', decimals: 0 },
-  SOL: { id: 'solana', pair: 'SOL / USD', decimals: 2 },
-};
+const EXCLUDED_SYMBOLS = new Set([
+  'BTC', 'ETH', 'SOL', 'USDT', 'USDC', 'DAI', 'FDUSD', 'USDE', 'BUSD', 'TUSD', 'WBTC', 'WETH', 'STETH',
+]);
 
-function fmtPrice(val, decimals = 0) {
+const BACKUP_ALTCOINS = [
+  { id: 'bittensor', symbol: 'TAO', name: 'Bittensor' },
+  { id: 'sui', symbol: 'SUI', name: 'Sui' },
+  { id: 'hyperliquid', symbol: 'HYPE', name: 'Hyperliquid' },
+  { id: 'ondo-finance', symbol: 'ONDO', name: 'Ondo' },
+  { id: 'pendle', symbol: 'PENDLE', name: 'Pendle' },
+  { id: 'ethena', symbol: 'ENA', name: 'Ethena' },
+];
+
+function inferDecimals(price) {
+  const n = Number(price);
+  if (!Number.isFinite(n) || n <= 0) return 2;
+  if (n >= 1000) return 0;
+  if (n >= 10) return 2;
+  if (n >= 0.1) return 4;
+  if (n >= 0.001) return 5;
+  return 6;
+}
+
+function fmtPrice(val, decimals = null) {
+  const d = decimals === null ? inferDecimals(val) : decimals;
   return `$${Number(val).toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    minimumFractionDigits: d,
+    maximumFractionDigits: d,
   })}`;
 }
 
@@ -31,32 +49,48 @@ async function fetchJson(url, timeoutMs = 10000) {
 }
 
 async function fetchLiveMarketSnapshot() {
-  const snapshot = { prices: {}, trending: [], headlines: [] };
-
-  try {
-    const p = await fetchJson(
-      'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana&vs_currencies=usd&include_24hr_change=true'
-    );
-    for (const [sym, cfg] of Object.entries(TICKERS)) {
-      if (p[cfg.id]?.usd) {
-        snapshot.prices[sym] = {
-          usd: Number(p[cfg.id].usd),
-          change24h: Number(p[cfg.id].usd_24h_change || 0),
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('Market price fetch failed:', err.message);
-  }
+  const snapshot = { chartCoins: [], trending: [], headlines: [] };
 
   try {
     const t = await fetchJson('https://api.coingecko.com/api/v3/search/trending');
-    snapshot.trending = (t.coins || [])
-      .slice(0, 5)
-      .map((c) => `${c.item?.symbol || ''} (${c.item?.name || ''})`)
-      .filter(Boolean);
+    const coins = (t.coins || [])
+      .map((c) => ({
+        id: c.item?.id,
+        symbol: String(c.item?.symbol || '').toUpperCase(),
+        name: c.item?.name || '',
+        change24h: Number(c.item?.data?.price_change_percentage_24h?.usd || 0),
+      }))
+      .filter((c) => c.id && c.symbol && !EXCLUDED_SYMBOLS.has(c.symbol));
+
+    snapshot.chartCoins = coins.slice(0, 5);
+    snapshot.trending = snapshot.chartCoins.map((c) => `${c.symbol} (${c.name})`);
+  } catch (err) {
+    console.warn('Trending coins fetch failed:', err.message);
+  }
+
+  if (snapshot.chartCoins.length < 3) {
+    const existing = new Set(snapshot.chartCoins.map((c) => c.symbol));
+    for (const alt of BACKUP_ALTCOINS) {
+      if (!existing.has(alt.symbol)) {
+        snapshot.chartCoins.push({ ...alt, change24h: 0 });
+      }
+      if (snapshot.chartCoins.length >= 5) break;
+    }
+  }
+
+  try {
+    const ids = snapshot.chartCoins.map((c) => c.id).join(',');
+    const p = await fetchJson(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(ids)}&vs_currencies=usd&include_24hr_change=true`
+    );
+    for (const coin of snapshot.chartCoins) {
+      if (p[coin.id]?.usd) {
+        coin.usd = Number(p[coin.id].usd);
+        coin.change24h = Number(p[coin.id].usd_24h_change ?? coin.change24h ?? 0);
+      }
+    }
   } catch {
-    // Optional
+    // OHLC still has latest close price
   }
 
   try {
@@ -81,23 +115,23 @@ async function fetchLiveMarketSnapshot() {
   return snapshot;
 }
 
-async function fetchOhlcCandles(symbol = 'BTC') {
-  const cfg = TICKERS[symbol] || TICKERS.BTC;
+async function fetchOhlcCandles(coin) {
   const rows = await fetchJson(
-    `https://api.coingecko.com/api/v3/coins/${cfg.id}/ohlc?vs_currency=usd&days=7`
+    `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(coin.id)}/ohlc?vs_currency=usd&days=7`
   );
   if (!Array.isArray(rows) || rows.length < 12) {
-    throw new Error(`Insufficient OHLC candles for ${symbol}`);
+    throw new Error(`Insufficient OHLC candles for ${coin.symbol}`);
   }
   return rows.slice(-34).map(([ts, o, h, l, c]) => ({ ts, o, h, l, c }));
 }
 
-function renderCandlestickChartPng(symbol, candles, change24h = 0) {
-  const cfg = TICKERS[symbol] || TICKERS.BTC;
+function renderCandlestickChartPng(coin, candles) {
+  const symbol = coin.symbol;
+  const change24h = Number(coin.change24h || 0);
   const width = 1200;
   const height = 675;
   const padLeft = 48;
-  const padRight = 132;
+  const padRight = 148;
   const padTop = 104;
   const padBottom = 56;
   const plotW = width - padLeft - padRight;
@@ -114,8 +148,8 @@ function renderCandlestickChartPng(symbol, candles, change24h = 0) {
   const recent12 = candles.slice(-12);
   const resistance = Math.max(...recent12.map((c) => c.h));
   const support = Math.min(...recent12.map((c) => c.l));
-  const last = candles[candles.length - 1];
-  const lastPrice = last.c;
+  const lastPrice = candles[candles.length - 1].c;
+  const decimals = inferDecimals(lastPrice);
 
   const yOf = (price) => padTop + ((maxP - price) / (maxP - minP)) * plotH;
 
@@ -125,7 +159,7 @@ function renderCandlestickChartPng(symbol, candles, change24h = 0) {
     const y = yOf(p).toFixed(1);
     gridLines.push(
       `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>`,
-      `<text x="${width - padRight + 14}" y="${Number(y) + 4}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="14">${fmtPrice(p, cfg.decimals)}</text>`
+      `<text x="${width - padRight + 14}" y="${Number(y) + 4}" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="14">${fmtPrice(p, decimals)}</text>`
     );
   }
 
@@ -160,27 +194,27 @@ function renderCandlestickChartPng(symbol, candles, change24h = 0) {
   <rect width="${width}" height="${height}" fill="#0b0c10"/>
   <rect x="1" y="1" width="${width - 2}" height="${height - 2}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
 
-  <text x="${padLeft}" y="48" fill="#f4f4f5" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700">${cfg.pair}  ·  4H</text>
-  <text x="${padLeft}" y="78" fill="#ffffff" font-family="DejaVu Sans Mono, monospace" font-size="30" font-weight="700">${fmtPrice(lastPrice, cfg.decimals)}</text>
+  <text x="${padLeft}" y="48" fill="#f4f4f5" font-family="DejaVu Sans, sans-serif" font-size="24" font-weight="700">${symbol} / USD  ·  4H</text>
+  <text x="${padLeft}" y="78" fill="#ffffff" font-family="DejaVu Sans Mono, monospace" font-size="30" font-weight="700">${fmtPrice(lastPrice, decimals)}</text>
 
-  <rect x="275" y="52" width="112" height="30" rx="6" fill="${chgBg}"/>
-  <text x="331" y="72" text-anchor="middle" fill="${chgColor}" font-family="DejaVu Sans Mono, monospace" font-size="16" font-weight="700">${chgSign}${change24h.toFixed(2)}%</text>
+  <rect x="295" y="52" width="112" height="30" rx="6" fill="${chgBg}"/>
+  <text x="351" y="72" text-anchor="middle" fill="${chgColor}" font-family="DejaVu Sans Mono, monospace" font-size="16" font-weight="700">${chgSign}${change24h.toFixed(2)}%</text>
 
-  <text x="${width - padRight}" y="48" text-anchor="end" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="14">AURELIAS DESK  ·  LIVE 4H</text>
+  <text x="${width - padRight}" y="48" text-anchor="end" fill="#71717a" font-family="DejaVu Sans Mono, monospace" font-size="14">AURELIAS DESK  ·  TRENDING 4H</text>
 
   ${gridLines.join('\n  ')}
 
   <line x1="${padLeft}" y1="${resY}" x2="${width - padRight}" y2="${resY}" stroke="#ef4444" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <text x="${padLeft + 8}" y="${Number(resY) - 8}" fill="#ef4444" font-family="DejaVu Sans Mono, monospace" font-size="13">48H HIGH  ${fmtPrice(resistance, cfg.decimals)}</text>
+  <text x="${padLeft + 8}" y="${Number(resY) - 8}" fill="#ef4444" font-family="DejaVu Sans Mono, monospace" font-size="13">48H HIGH  ${fmtPrice(resistance, decimals)}</text>
 
   <line x1="${padLeft}" y1="${supY}" x2="${width - padRight}" y2="${supY}" stroke="#84cc16" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="6 5"/>
-  <text x="${padLeft + 8}" y="${Number(supY) + 18}" fill="#84cc16" font-family="DejaVu Sans Mono, monospace" font-size="13">48H LOW   ${fmtPrice(support, cfg.decimals)}</text>
+  <text x="${padLeft + 8}" y="${Number(supY) + 18}" fill="#84cc16" font-family="DejaVu Sans Mono, monospace" font-size="13">48H LOW   ${fmtPrice(support, decimals)}</text>
 
   ${candleSvg}
 
   <line x1="${padLeft}" y1="${curY}" x2="${width - padRight}" y2="${curY}" stroke="#a1a1aa" stroke-opacity="0.4" stroke-width="1" stroke-dasharray="3 3"/>
-  <rect x="${width - padRight + 8}" y="${Number(curY) - 13}" width="112" height="26" rx="4" fill="#f4f4f5"/>
-  <text x="${width - padRight + 64}" y="${Number(curY) + 5}" text-anchor="middle" fill="#0b0c10" font-family="DejaVu Sans Mono, monospace" font-size="14" font-weight="700">${fmtPrice(lastPrice, cfg.decimals)}</text>
+  <rect x="${width - padRight + 8}" y="${Number(curY) - 13}" width="126" height="26" rx="4" fill="#f4f4f5"/>
+  <text x="${width - padRight + 71}" y="${Number(curY) + 5}" text-anchor="middle" fill="#0b0c10" font-family="DejaVu Sans Mono, monospace" font-size="13" font-weight="700">${fmtPrice(lastPrice, decimals)}</text>
 </svg>`;
 
   const resvg = new Resvg(svg, { fitTo: { mode: 'width', value: width } });
@@ -188,14 +222,16 @@ function renderCandlestickChartPng(symbol, candles, change24h = 0) {
 
   const stamp = new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
   const rand = crypto.randomBytes(3).toString('hex');
-  const filename = `chart-${symbol.toLowerCase()}-${stamp}-${rand}.png`;
+  const filename = `chart-${symbol.toLowerCase().replace(/[^a-z0-9]/g, '')}-${stamp}-${rand}.png`;
   fs.mkdirSync(GENERATED_DIR, { recursive: true });
   fs.writeFileSync(path.join(GENERATED_DIR, filename), pngBuffer);
 
   return {
     imagePath: `assets/social/generated/${filename}`,
     symbol,
+    name: coin.name,
     price: lastPrice,
+    decimals,
     support,
     resistance,
     change24h,
@@ -203,7 +239,6 @@ function renderCandlestickChartPng(symbol, candles, change24h = 0) {
 }
 
 module.exports = {
-  TICKERS,
   fmtPrice,
   fetchLiveMarketSnapshot,
   fetchOhlcCandles,
