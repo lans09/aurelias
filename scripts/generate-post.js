@@ -32,69 +32,69 @@ const BANNED_PATTERNS = [
 
 const PILLARS = [
   {
-    id: 'onchain',
+    id: 'orderflow',
     weight: 25,
     isPromo: false,
     angles: [
       {
-        name: 'Stablecoin Settlement Reality',
-        brief: 'Make a sharp, grounded observation about how USDC and stablecoins quietly became crypto’s real killer app for global settlement.',
+        name: 'Liquidity Sweeps & Funding',
+        brief: 'Sharp trading-desk observation on how high open interest and crowded perp funding usually lead to a liquidity sweep before the real trend starts.',
         visualSeed: 'Minimalist macro studio photograph of translucent smoked glass blocks stacked on matte black basalt stone with a single razor-thin lime (#84cc16) light edge. No text.',
       },
       {
-        name: 'Multi-Chain UX Friction',
-        brief: 'Comment on why normal users should never have to care about RPCs, bridges, or gas tokens just to send $2 across ETH, Solana, TON, or Bitcoin.',
+        name: 'Spot vs Perp Divergence',
+        brief: 'Note how spot-led rallies behave completely differently from leverage-driven pumps, and why serious desks track spot CVD first.',
         visualSeed: 'Clean architectural 3D render of six dark brushed-titanium rails converging smoothly into a single illuminated obsidian hub on a velvet black background. No text.',
       },
       {
-        name: 'Speed vs Finality',
-        brief: 'Short technical-but-readable note comparing how fast modern L1/L2 settlement feels compared to 3-day bank wires.',
+        name: 'Session Liquidity',
+        brief: 'Short, grounded trading remark on how London and New York market opens shape crypto volatility and fakeouts.',
         visualSeed: 'High-contrast dark editorial still life of a precision mechanical chronograph resting on matte obsidian slate under moody directional studio light. No text.',
       },
     ],
   },
   {
-    id: 'fairness',
-    weight: 20,
-    isPromo: false,
-    angles: [
-      {
-        name: 'Why Trust Me Fails',
-        brief: 'Explain in plain English why verifiable on-chain randomness (like Chainlink VRF) beats opaque backend databases where users just have to trust the operator.',
-        visualSeed: 'Precision dark titanium cryptographic gyroscope suspended inside smoked obsidian glass with subtle emerald-lime rim light, luxury Swiss watchmaking photography. No text.',
-      },
-      {
-        name: 'Public Auditability',
-        brief: 'Sharp 1-2 line take on how open ledgers change incentives: when every payout and timestamp is verifiable, reputation becomes math instead of marketing.',
-        visualSeed: 'Minimalist dark geometric sculpture of interlocking matte carbon and brushed steel rings catching crisp studio highlights on deep black. No text.',
-      },
-    ],
-  },
-  {
-    id: 'psychology',
+    id: 'risk',
     weight: 25,
     isPromo: false,
     angles: [
       {
-        name: 'Asymmetric Risk',
-        brief: 'Thoughtful observation on asymmetric bets: risking a tiny, capped amount for outsized upside only works when you respect your downside.',
-        visualSeed: 'Moody luxury editorial photography of a single sleek dark obsidian prism casting a sharp electric-lime light refraction across matte black stone. No text.',
+        name: 'Invalidation Over Conviction',
+        brief: 'Trading desk principle: knowing where your trade is wrong before entering matters more than how bullish your thesis sounds.',
+        visualSeed: 'Precision dark titanium cryptographic gyroscope suspended inside smoked obsidian glass with subtle emerald-lime rim light, luxury Swiss watchmaking photography. No text.',
       },
       {
-        name: 'Signal Over Noise',
-        brief: 'Crisp, human remark about how quiet execution and clean design always outlast loud hype in crypto cycles.',
+        name: 'Surviving Chop',
+        brief: 'Crisp take on why most traders lose money in sideways ranges, not crashes: over-sizing when there is zero directional edge.',
+        visualSeed: 'Minimalist dark geometric sculpture of interlocking matte carbon and brushed steel rings catching crisp studio highlights on deep black. No text.',
+      },
+      {
+        name: 'Asymmetric R:R Math',
+        brief: 'Explain why capping downside cleanly and letting asymmetric setups work is the only math that compounds over 100+ trades.',
+        visualSeed: 'Moody luxury editorial photography of a single sleek dark obsidian prism casting a sharp electric-lime light refraction across matte black stone. No text.',
+      },
+    ],
+  },
+  {
+    id: 'debates',
+    weight: 25,
+    isPromo: false,
+    angles: [
+      {
+        name: 'Execution Rail Debate',
+        brief: 'Ask a sharp, engaging question to traders about which chain currently has the best execution and settlement UX: Solana, Base, ETH, or TON.',
         visualSeed: 'Ultra-minimalist dark architectural interior bathed in deep shadows with one thin vertical slit of crisp warm-lime light on concrete. No text.',
       },
       {
-        name: 'Patience in Markets',
-        brief: 'Short, relatable reflection for traders on why sitting on your hands is often the hardest position to hold.',
+        name: 'Wallet Hygiene & Security',
+        brief: 'Practical trading-desk warning: never blind-sign Permit2 or unlimited token approvals; keep hot execution wallets separate from cold storage.',
         visualSeed: 'Dark luxury studio still life of matte black ceramic spheres balanced on a brushed titanium beam, calm moody lighting. No text.',
       },
     ],
   },
   {
     id: 'aurelias_promo',
-    weight: 30,
+    weight: 25,
     isPromo: true,
     angles: [
       {
@@ -103,8 +103,8 @@ const PILLARS = [
         visualSeed: 'Dark obsidian (#08080a) editorial card with brushed titanium rows showing "36 WINNERS • $2 ENTRY" and "50,000 USDC" with hairline #84cc16 lime accents.',
       },
       {
-        name: '60-Second Multi-Chain Entry',
-        brief: 'Focus on how fast AURELIAS Season 04 is: no wallet popups, enter with ETH, BNB, USDT, TON, Solana, or BTC inside a 15-minute window.',
+        name: 'Zero Wallet Connect Entry',
+        brief: 'Focus on how AURELIAS Season 04 works: no wallet popups, enter with ETH, BNB, USDT, TON, Solana, or BTC inside a 15-minute window.',
         visualSeed: 'Luxury macro studio render of a dark titanium chronometer surrounded by matte metallic chain marks on deep obsidian, crisp minimal text "ENTER IN 60 SECONDS".',
       },
       {
@@ -200,11 +200,11 @@ function sanitizeTweet(raw, siteUrl, includeUrl) {
 function buildFallbackPost(siteUrl, pillar, angle, timing) {
   if (!pillar.isPromo) {
     const organicPool = [
-      'Most people still underestimate how much cross-border volume now settles in USDC instead of traditional bank rails. Speed and transparency compound quietly.',
-      'Good crypto UX means you should never think about bridges, RPCs, or gas tokens just to move $2.',
-      'In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge.',
-      'Verifiable randomness matters because "trust the backend" is not a security model.',
-      'Quiet execution and clean design always outlast loud hype.',
+      'Most chop wipes out traders not because their macro thesis was wrong, but because they oversized into zero directional edge.',
+      'Spot CVD still leads healthy trends. When perps push higher while spot sells, liquidity sweeps usually follow.',
+      'Know your exact invalidation price before clicking buy. Conviction without an exit plan is just hope.',
+      'Never blind-sign unlimited token approvals on unfamiliar frontends. Keep hot execution wallets separate from cold storage.',
+      'Sitting on your hands during low-volume chop is still the hardest position to hold.',
     ];
     const text = organicPool[Math.floor(Math.random() * organicPool.length)];
     return { text, angle: angle.name, imagePrompt: angle.visualSeed };
@@ -226,8 +226,8 @@ async function generateCopyWithGemini(apiKey, siteUrl, pillar, angle, history, t
   const recentTexts = history.slice(-8).map((h, i) => `${i + 1}. ${h.text}`).join('\n');
 
   const rules = [
-    'You write crisp, human, high-taste X (Twitter) posts for an editorial crypto & fintech brand account.',
-    'Write like a sharp founder or macro observer, NEVER like an AI copywriter or hype marketer.',
+    'You write crisp, human, high-taste X (Twitter) posts for AURELIAS, a crypto trading company and execution desk.',
+    'Write like an experienced proprietary trader or desk analyst, NEVER like an AI copywriter or hype marketer.',
     'Hard bans (violating ANY of these is an instant fail):',
     '- NO em-dashes or en-dashes.',
     '- NO hashtags (#).',
