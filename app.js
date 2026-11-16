@@ -370,12 +370,15 @@ function updateRoundCountdown() {
 }
 
 function recordVisit() {
+  const params = new URLSearchParams(window.location.search);
+  const ref = params.get('ref') || params.get('utm_source') || '';
   fetch('/api/visit', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       path: window.location.pathname || '/',
       referrer: document.referrer || '',
+      ref,
     }),
   }).catch(() => {});
 }

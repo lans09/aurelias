@@ -5,7 +5,7 @@ const dns = require('node:dns');
 
 dns.setDefaultResultOrder('ipv4first');
 
-const DEFAULT_SITE_URL = 'https://www.evmsync.live/';
+const DEFAULT_SITE_URL = 'https://www.evmsync.live/?ref=x';
 const GENERATED_DIR = path.join(__dirname, '..', 'assets', 'social', 'generated');
 const POOL_DIR = path.join(__dirname, '..', 'assets', 'social', 'pool');
 const HISTORY_FILE = path.join(__dirname, '..', 'assets', 'social', '.post-history.json');
@@ -487,7 +487,10 @@ async function main() {
   const isPreview = process.argv.includes('--preview');
   const count = getCountArg();
   const apiKey = (process.env.GEMINI_API_KEY || '').trim();
-  const siteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim() || DEFAULT_SITE_URL;
+  const rawSiteUrl = (process.env.SITE_URL || DEFAULT_SITE_URL).trim() || DEFAULT_SITE_URL;
+  const siteUrl = rawSiteUrl.includes('ref=')
+    ? rawSiteUrl
+    : `${rawSiteUrl}${rawSiteUrl.includes('?') ? '&' : '?'}ref=x`;
   let history = loadHistory();
   const timing = getTimingContext();
   const slots = buildScheduleSlots(count);

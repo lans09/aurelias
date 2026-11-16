@@ -93,12 +93,18 @@ function parseDevice(ua = '') {
   return 'Other';
 }
 
-function normalizeReferrer(rawRef) {
+function normalizeSource(refParam, rawRef) {
+  const ref = String(refParam || '').trim().toLowerCase();
+  if (ref === 'x' || ref === 'twitter') return 'X (Twitter)';
+  if (ref === 'tg' || ref === 'telegram') return 'Telegram';
+  if (ref) return ref.slice(0, 32);
+
   if (!rawRef) return 'Direct';
   try {
     const host = new URL(rawRef).hostname.replace(/^www\./, '');
     if (host === 't.co' || host === 'x.com' || host === 'twitter.com') return 'X (Twitter)';
-    if (host.includes('evmsync.live')) return 'Internal';
+    if (host === 't.me' || host === 'telegram.org') return 'Telegram';
+    if (host.includes('evmsync.live')) return 'Direct';
     return host || 'Direct';
   } catch {
     return String(rawRef).slice(0, 48) || 'Direct';
@@ -158,7 +164,7 @@ module.exports = async function handler(req, res) {
         at: Date.now(),
         visitorId: visitorHash,
         path: String(body.path || '/').slice(0, 80),
-        source: normalizeReferrer(body.referrer || req.headers.referer || ''),
+        source: normalizeSource(body.ref, body.referrer || ''),
         device: parseDevice(ua),
         location,
       };
