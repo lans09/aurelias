@@ -2,7 +2,7 @@ const RAFFLE_ETH_CONTRACT = '0x610178dA211FEF7D417bC0e6FeD39F05609AD788';
 const ENTRY_FEE_USD = 2;
 const BASE_POOL_USDC = 50000;
 const PAYMENT_WINDOW_SECONDS = 15 * 60;
-const ROUND_DEADLINE_KEY = 'aurelias_round_deadline_v1';
+const ROUND_DEADLINE_KEY = 'aurelias_round_deadline_30d_v1';
 
 const EVM_RECEIVING = '0xf2B57a41c76a9AA721B4b3238B255bD68D52CDE2';
 const SOL_RECEIVING = 'f5diEdws555ShFASuqxT1KBYjtZLRdWBAEvgy6DMAGY';
@@ -359,14 +359,15 @@ function updateRoundCountdown() {
   let deadline = Number(localStorage.getItem(ROUND_DEADLINE_KEY) || 0);
   const now = Date.now();
   if (!deadline || deadline <= now) {
-    deadline = now + 72 * 60 * 60 * 1000;
+    deadline = now + 30 * 24 * 60 * 60 * 1000;
     localStorage.setItem(ROUND_DEADLINE_KEY, String(deadline));
   }
   const diff = Math.max(0, deadline - now);
-  const hours = String(Math.floor(diff / 3600000)).padStart(2, '0');
+  const days = Math.floor(diff / 86400000);
+  const hours = String(Math.floor((diff % 86400000) / 3600000)).padStart(2, '0');
   const mins = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
   const secs = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-  roundCountdownEl.textContent = `${hours}:${mins}:${secs}`;
+  roundCountdownEl.textContent = `${days}d ${hours}:${mins}:${secs}`;
 }
 
 function recordVisit() {

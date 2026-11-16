@@ -40,7 +40,7 @@ const BANNED_PATTERNS = [
 ];
 
 function getTimingContext() {
-  const ROUND_MS = 72 * 60 * 60 * 1000;
+  const ROUND_MS = 30 * 24 * 60 * 60 * 1000;
   const customDeadline = process.env.ROUND_DEADLINE_ISO
     ? Date.parse(process.env.ROUND_DEADLINE_ISO)
     : NaN;
@@ -49,20 +49,19 @@ function getTimingContext() {
   if (!Number.isNaN(customDeadline) && customDeadline > Date.now()) {
     remainingMs = customDeadline - Date.now();
   } else {
-    const anchor = Date.UTC(2026, 10, 15, 0, 0, 0);
+    const anchor = Date.UTC(2026, 10, 16, 0, 0, 0);
     const elapsed = (Date.now() - anchor) % ROUND_MS;
     remainingMs = ROUND_MS - (elapsed < 0 ? elapsed + ROUND_MS : elapsed);
   }
 
   const hoursLeft = Math.max(1, Math.floor(remainingMs / (60 * 60 * 1000)));
+  const daysLeft = Math.max(1, Math.ceil(hoursLeft / 24));
   const label =
-    hoursLeft <= 6
-      ? `Final ${hoursLeft}h left in this 72h round`
-      : hoursLeft <= 24
-        ? `Under ${hoursLeft}h left in the 72h Season 04 round`
-        : `${hoursLeft}h remaining in the current 72h Season 04 window`;
+    hoursLeft <= 24
+      ? `Final ${hoursLeft}h left in the 30-day Season 04 round`
+      : `${daysLeft} days remaining in the 30-day Season 04 window`;
 
-  return { hoursLeft, label };
+  return { hoursLeft, daysLeft, label };
 }
 
 function loadHistory() {
@@ -134,7 +133,7 @@ function buildFallbackPost({ mode, siteUrl, timing, pool, pools, chartInfo, vari
     const promoVariants = [
       `Traders happily burn $40 in DEX slippage aping thin pools, then overthink a capped $2 asymmetric bet.\n\n${timing.label}.\n• 1x 20,000 USDC\n• 5x 3,000 USDC\n• 30x 500 USDC\n\nZero wallet connect:\n${siteUrl}`,
       `${timing.label}.\n\n50,000 USDC split across 36 winners instead of winner-takes-all:\n• 1x 20,000 USDC\n• 5x 3,000 USDC\n• 30x 500 USDC\n\n$2 entry from your own wallet app:\n${siteUrl}`,
-      `Most crypto draws ask for wallet-connect signatures. We don't.\n\nPaste your sending address, send $2, and lock in 36 shots at 50,000 USDC (${timing.hoursLeft}h left).\n${siteUrl}`,
+      `Most crypto draws ask for wallet-connect signatures. We don't.\n\nPaste your sending address, send $2, and lock in 36 shots at 50,000 USDC (${timing.daysLeft}d left).\n${siteUrl}`,
     ];
     return sanitizeTweet(promoVariants[variantIdx % promoVariants.length], siteUrl, true);
   }
