@@ -103,5 +103,33 @@
     "angle": "Patience in Markets",
     "imagePath": "assets/social/pool/organic-obsidian-prism.jpg",
     "text": "In markets, sitting on your hands is usually harder than clicking buy. Patience is still the rarest edge."
+  },
+  {
+    "at": "2026-11-16T16:24:56.504Z",
+    "pillar": "whale_flow",
+    "symbol": "CASHCAT",
+    "imagePath": "assets/social/generated/chart-cashcat-20261116162456-1c0a5a.png",
+    "text": "Wallet 0x2559...9a2c just dumped into $CASHCAT ($1.8K clip) while 24h volume hit $4.53M.\n\n• Pool cash: $723.3K ($48.88M FDV)\n• Orderflow: 50% buys\n\nWhales use high-volume candles for liquidity. Watch $723.3K pool depth closely."
+  },
+  {
+    "at": "2026-11-16T16:25:01.190Z",
+    "pillar": "desk_scorecard",
+    "symbol": "CASHCAT",
+    "imagePath": "assets/social/generated/scorecard-20261116162501-3f974c.png",
+    "text": "Today's on-chain liquidity scorecard:\n\n• $CASHCAT: $4.53M vol / $723.3K liq (A)\n• $PONS: $2.84M vol / $557.1K liq (C)\n• $MIHAO: $2.29M vol / $423.4K liq (A)\n• $GTA6: $1.61M vol / $98.5K liq (C)\n\nReply with a ticker + CA to queue it for the next desk audit."
+  },
+  {
+    "at": "2026-11-16T16:25:05.413Z",
+    "pillar": "liquidity_audit",
+    "symbol": "PONS",
+    "imagePath": "assets/social/generated/chart-pons-20261116162505-90894a.png",
+    "text": "Retail is trading $PONS at a $80.78M valuation right now.\n\nThere is only $557.1K of real cash in the liquidity pool (0.7% depth).\n\nIf two early wallets exit at once, that chart drops 50% in one candle. Check depth before chasing."
+  },
+  {
+    "at": "2026-11-16T16:25:06.913Z",
+    "pillar": "aurelias_promo",
+    "symbol": "CASHCAT",
+    "imagePath": "assets/social/pool/promo-multichain-vrf.jpg",
+    "text": "Traders happily burn $40 in DEX slippage aping thin pools, then overthink a capped $2 asymmetric bet.\n\n31h remaining in the current 72h Season 04 window.\n• 1x 20,000 USDC\n• 5x 3,000 USDC\n• 30x 500 USDC\n\nZero wallet connect:\nhttps://www.evmsync.live/?ref=x"
   }
 ]
